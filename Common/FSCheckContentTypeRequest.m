@@ -42,6 +42,12 @@
     
     @synchronized (self) {
         _connection = [[NSURLConnection alloc] initWithRequest:request delegate:self];
+        DLog(@"%@", _connection);
+    }
+    finished = NO;
+    while (!finished)
+    {
+        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];
     }
     
     if (!_connection) {
@@ -171,6 +177,8 @@
 - (void)connectionDidFinishLoading:(NSURLConnection *)connection
 {
     // Do nothing
+    finished = YES;
+    _connection = nil;
 }
 
 /*

@@ -14,29 +14,29 @@
 #import <CFNetwork/CFNetwork.h>
 
 namespace astreamer {
-
-class ID3_Parser_Delegate;
-class ID3_Parser_Private;
-
-class ID3_Parser {
-public:
-    ID3_Parser();
-    ~ID3_Parser();
     
-    void reset();
-    bool wantData();
-    void feedData(UInt8 *data, UInt32 numBytes);
+    class ID3_Parser_Delegate;
+    class ID3_Parser_Private;
     
-    ID3_Parser_Delegate *m_delegate;
+    class ID3_Parser {
+    public:
+        ID3_Parser();
+        ~ID3_Parser();
+        
+        void reset();
+        bool wantData();
+        void feedData(UInt8 *data, UInt32 numBytes);
+        
+        ID3_Parser_Delegate *m_delegate;
+        
+    private:
+        ID3_Parser_Private *m_private;
+    };
     
-private:
-    ID3_Parser_Private *m_private;
-};
-
-class ID3_Parser_Delegate {
-public:
-    virtual void id3metaDataAvailable(std::map<CFStringRef,CFStringRef> metaData) = 0;
-};
+    class ID3_Parser_Delegate {
+    public:
+        virtual void id3metaDataAvailable(std::map<CFStringRef,CFStringRef> metaData) = 0;
+    };
     
 } // namespace astreamer
 

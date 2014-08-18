@@ -9,22 +9,22 @@
 #include "file_output.h"
 
 namespace astreamer {
-
-File_Output::File_Output(CFURLRef fileURL) :
+    
+    File_Output::File_Output(CFURLRef fileURL) :
     m_writeStream(CFWriteStreamCreateWithFile(kCFAllocatorDefault, fileURL))
-{
-    CFWriteStreamOpen(m_writeStream);
-}
+    {
+        CFWriteStreamOpen(m_writeStream);
+    }
     
-File_Output::~File_Output()
-{
-    CFWriteStreamClose(m_writeStream);
-    CFRelease(m_writeStream);
-}
+    File_Output::~File_Output()
+    {
+        CFWriteStreamClose(m_writeStream);
+        CFRelease(m_writeStream);
+    }
     
-CFIndex File_Output::write(const UInt8 *buffer, CFIndex bufferLength)
-{
-    return CFWriteStreamWrite(m_writeStream, buffer, bufferLength);
-}
-
+    CFIndex File_Output::write(const UInt8 *buffer, CFIndex bufferLength)
+    {
+        return CFWriteStreamWrite(m_writeStream, buffer, bufferLength);
+    }
+    
 } // namespace astreamer

@@ -215,6 +215,14 @@ NSString*             freeStreamerReleaseVersion();
 - (void)seekToPosition:(FSStreamPosition)position;
 
 /**
+ * Seeks the stream to a given time value. Requires a non-continuous stream
+ * (a stream with a known duration).
+ *
+ * @param time The stream time value to seek to.
+ */
+- (void)seekToTime:(double)time;
+
+/**
  * Sets the audio stream volume from 0.0 to 1.0.
  * Note that the overall volume is still constrained by the volume
  * set by the user! So the actual volume cannot be higher
@@ -265,11 +273,13 @@ NSString*             freeStreamerReleaseVersion();
  * The current playback position cannot be determined for continuous streams.
  */
 @property (nonatomic,readonly) FSStreamPosition currentTimePlayed;
+@property (nonatomic,readonly) double currentTimePlayedDouble;
 /**
  * This property has the duration of the stream, if the stream is non-continuous.
  * Continuous streams do not have a duration.
  */
 @property (nonatomic,readonly) FSStreamPosition duration;
+@property (nonatomic,readonly) double durationDouble;
 /**
  * This property has the current seek byte offset of the stream, if the stream is non-continuous.
  * Continuous streams do not have a seek byte offset.

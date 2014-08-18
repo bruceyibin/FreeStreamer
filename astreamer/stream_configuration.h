@@ -13,28 +13,28 @@
 
 namespace astreamer {
     
-struct Stream_Configuration {
-    unsigned bufferCount;
-    unsigned bufferSize;
-    unsigned maxPacketDescs;
-    unsigned decodeQueueSize;
-    unsigned httpConnectionBufferSize;
-    double outputSampleRate;
-    long outputNumChannels;
-    int bounceInterval;
-    int maxBounceCount;
-    int startupWatchdogPeriod;
-    CFStringRef userAgent;
-    
-    static Stream_Configuration *configuration();
-    
-private:
-    Stream_Configuration();
-    ~Stream_Configuration();
-    
-    Stream_Configuration(const Stream_Configuration&);
-    Stream_Configuration& operator=(const Stream_Configuration&);
-};
+    struct Stream_Configuration {
+        unsigned bufferCount;
+        unsigned bufferSize;
+        unsigned maxPacketDescs;
+        unsigned decodeQueueSize;
+        unsigned httpConnectionBufferSize;
+        double outputSampleRate;
+        long outputNumChannels;
+        int bounceInterval;
+        int maxBounceCount;
+        int startupWatchdogPeriod;
+        CFStringRef userAgent;
+        
+        static Stream_Configuration *configuration();
+        
+    private:
+        Stream_Configuration();
+        ~Stream_Configuration();
+        
+        Stream_Configuration(const Stream_Configuration&);
+        Stream_Configuration& operator=(const Stream_Configuration&);
+    };
     
 } // namespace astreamer
 

@@ -39,15 +39,15 @@
         [systemVersion appendString:@"OS X"];
 #endif
         
-        self.bufferCount    = 8;
-        self.bufferSize     = 32768;
+        self.bufferCount = 8;
+        self.bufferSize = 32768;
         self.maxPacketDescs = 512;
         self.decodeQueueSize = 32;
         self.httpConnectionBufferSize = 1024;
         self.outputSampleRate = 44100;
         self.outputNumChannels = 2;
-        self.bounceInterval    = 10;
-        self.maxBounceCount    = 4;   // Max number of bufferings in bounceInterval seconds
+        self.bounceInterval = 10;
+        self.maxBounceCount = 4;   // Max number of bufferings in bounceInterval seconds
         self.startupWatchdogPeriod = 30; // If the stream doesn't start to play in this seconds, the watchdog will fail it
         self.userAgent = [NSString stringWithFormat:@"FreeStreamer/%@ (%@)", freeStreamerReleaseVersion(), systemVersion];
         
@@ -156,6 +156,7 @@ public:
 @property (nonatomic,assign) BOOL wasInterrupted;
 @property (nonatomic,assign) BOOL wasDisconnected;
 @property (nonatomic,assign) BOOL wasContinuousStream;
+@property (nonatomic,assign) FSSeekByteOffset lastSeekByteOffset;
 @property (readonly) FSStreamConfiguration *configuration;
 @property (readonly) NSString *formatDescription;
 @property (copy) void (^onCompletion)();
@@ -176,9 +177,12 @@ public:
 - (BOOL)isPlaying;
 - (void)pause;
 - (void)seekToTime:(unsigned)newSeekTime;
+- (void)seekToTimeDouble:(double)newSeekTime;
 - (void)setVolume:(float)volume;
 - (unsigned)timePlayedInSeconds;
+- (double)timePlayedInSecondsDouble;
 - (unsigned)durationInSeconds;
+- (double)durationInSecondsDouble;
 - (astreamer::HTTP_Stream_Position)streamPositionForTime:(unsigned)newSeekTime;
 @end
 
@@ -300,7 +304,7 @@ public:
     _audioStream->open(&position);
     
     _audioStream->setSeekPosition(offset.position);
-    _audioStream->setContentLength(offset.end);
+    _audioStream->setContentLength((size_t)offset.end);
     
     [_reachability startNotifier];
 }
@@ -419,9 +423,10 @@ public:
     
     if ([self isPlaying] && !internetConnectionAvailable) {
         self.wasDisconnected = YES;
+        self.lastSeekByteOffset = self.stream.currentSeekByteOffset;
         
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-        NSLog(@"FSAudioStream: Error: Internet connection disconnected while playing a stream.");
+        NSLog(@"FSAudioStream: Error: Internet connection disconnected while playing a stream. %d", self.lastSeekByteOffset.position);
 #endif
     }
     
@@ -439,10 +444,14 @@ public:
          */
         [NSTimer scheduledTimerWithTimeInterval:1
                                          target:self
-                                       selector:@selector(play)
+                                       selector:@selector(continuePlay)
                                        userInfo:nil
                                         repeats:NO];
     }
+}
+
+- (void)continuePlay {
+    [self playFromOffset:self.lastSeekByteOffset];
 }
 
 - (void)interruptionOccurred:(NSNotification *)notification
@@ -531,6 +540,11 @@ public:
     _audioStream->seekToTime(newSeekTime);
 }
 
+- (void)seekToTimeDouble:(double)newSeekTime
+{
+    _audioStream->seekToTimeDouble(newSeekTime);
+}
+
 - (void)setVolume:(float)volume
 {
     _audioStream->setVolume(volume);
@@ -541,9 +555,16 @@ public:
     return _audioStream->timePlayedInSeconds();
 }
 
-- (unsigned)durationInSeconds
-{
+- (double)timePlayedInSecondsDouble {
+    return _audioStream->timePlayedInSecondsDouble();
+}
+
+- (unsigned)durationInSeconds {
     return _audioStream->durationInSeconds();
+}
+
+- (double)durationInSecondsDouble {
+    return _audioStream->durationInSecondsDouble();
 }
 
 - (astreamer::HTTP_Stream_Position)streamPositionForTime:(unsigned)newSeekTime
@@ -551,8 +572,7 @@ public:
     return _audioStream->streamPositionForTime(newSeekTime);
 }
 
--(NSString *)description
-{
+- (NSString *)description {
     return [NSString stringWithFormat:@"[FreeStreamer %@] URL: %@\nbufferCount: %i\nbufferSize: %i\nmaxPacketDescs: %i\ndecodeQueueSize: %i\nhttpConnectionBufferSize: %i\noutputSampleRate: %f\noutputNumChannels: %ld\nbounceInterval: %i\nmaxBounceCount: %i\nstartupWatchdogPeriod: %i\nformat: %@\nuserAgent: %@",
             freeStreamerReleaseVersion(),
             self.url,
@@ -720,6 +740,10 @@ public:
     [_private seekToTime:seekTime];
 }
 
+- (void)seekToTime:(double)time {
+    [_private seekToTimeDouble:time];
+}
+
 - (void)setVolume:(float)volume
 {
     [_private setVolume:volume];
@@ -743,6 +767,11 @@ public:
     return pos;
 }
 
+- (double)currentTimePlayedDouble {
+    double c = [_private timePlayedInSecondsDouble];
+    return c;
+}
+
 - (FSStreamPosition)duration
 {
     unsigned u = [_private durationInSeconds];
@@ -754,6 +783,11 @@ public:
     
     FSStreamPosition pos = {.minute = m, .second = s};
     return pos;
+}
+
+- (double)durationDouble {
+    double d = [_private durationInSecondsDouble];
+    return d;
 }
 
 - (FSSeekByteOffset)currentSeekByteOffset
