@@ -57,8 +57,7 @@ typedef enum {
 } NetworkStatus;
 #define kReachabilityChangedNotification @"kNetworkReachabilityChangedNotification"
 
-@interface Reachability: NSObject
-{
+@interface Reachability: NSObject {
 	BOOL localWiFiRef;
 	SCNetworkReachabilityRef reachabilityRef;
 }
@@ -84,4 +83,5 @@ typedef enum {
 //WWAN may be available, but not active until a connection has been established.
 //WiFi may require a connection for VPN on Demand.
 - (BOOL) connectionRequired;
+
 @end

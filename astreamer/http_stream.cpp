@@ -11,7 +11,7 @@
 #include "id3_parser.h"
 #include "stream_configuration.h"
 
-#define HS_DEBUG 1
+//#define HS_DEBUG 1
 
 #if !defined (HS_DEBUG)
 #define HS_TRACE(...) do {} while (0)
@@ -28,13 +28,12 @@
 
 namespace astreamer {
     
-    CFStringRef HTTP_Stream::httpRequestMethod   = CFSTR("GET");
+    CFStringRef HTTP_Stream::httpRequestMethod = CFSTR("GET");
     CFStringRef HTTP_Stream::httpUserAgentHeader = CFSTR("User-Agent");
-    CFStringRef HTTP_Stream::httpRangeHeader     = CFSTR("Range");
+    CFStringRef HTTP_Stream::httpRangeHeader = CFSTR("Range");
     CFStringRef HTTP_Stream::icyMetaDataHeader = CFSTR("Icy-MetaData");
-    CFStringRef HTTP_Stream::icyMetaDataValue  = CFSTR("1"); /* always request ICY metadata, if available */
-    
-    
+    CFStringRef HTTP_Stream::icyMetaDataValue = CFSTR("1"); /* always request ICY metadata, if available */
+
     /* HTTP_Stream: public */
     HTTP_Stream::HTTP_Stream() :
     m_readStream(0),
@@ -45,7 +44,7 @@ namespace astreamer {
     m_httpHeadersParsed(false),
     m_contentType(0),
     m_contentLength(0),
-    
+
     m_icyStream(false),
     m_icyHeaderCR(false),
     m_icyHeadersRead(false),
@@ -60,13 +59,11 @@ namespace astreamer {
     m_httpReadBuffer(0),
     m_icyReadBuffer(0),
     
-    m_id3Parser(new ID3_Parser())
-    {
+    m_id3Parser(new ID3_Parser()) {
         m_id3Parser->m_delegate = this;
     }
     
-    HTTP_Stream::~HTTP_Stream()
-    {
+    HTTP_Stream::~HTTP_Stream() {
         close();
         
         for (std::vector<CFStringRef>::iterator h = m_icyHeaderLines.begin(); h != m_icyHeaderLines.end(); ++h) {
@@ -96,23 +93,19 @@ namespace astreamer {
         delete m_id3Parser, m_id3Parser = 0;
     }
     
-    HTTP_Stream_Position HTTP_Stream::position()
-    {
+    HTTP_Stream_Position HTTP_Stream::position() {
         return m_position;
     }
     
-    CFStringRef HTTP_Stream::contentType()
-    {
+    CFStringRef HTTP_Stream::contentType() {
         return m_contentType;
     }
     
-    size_t HTTP_Stream::contentLength()
-    {
+    size_t HTTP_Stream::contentLength() {
         return m_contentLength;
     }
     
-    bool HTTP_Stream::open()
-    {
+    bool HTTP_Stream::open() {
         HTTP_Stream_Position position;
         position.start = 0;
         position.end = 0;
@@ -122,13 +115,10 @@ namespace astreamer {
         m_id3Parser->reset();
 #endif
         
-        HS_TRACE_CFSTRING(CFURLGetString(m_url));
-        
         return open(position);
     }
     
-    bool HTTP_Stream::open(const HTTP_Stream_Position& position)
-    {
+    bool HTTP_Stream::open(const HTTP_Stream_Position &position) {
         bool success = false;
         CFStreamClientContext CTX = { 0, this, NULL, NULL, NULL };
         
@@ -174,9 +164,9 @@ namespace astreamer {
             goto out;
         }
         
-        if (!CFReadStreamSetClient(m_readStream, kCFStreamEventHasBytesAvailable |
-                                   kCFStreamEventEndEncountered |
-                                   kCFStreamEventErrorOccurred, readCallBack, &CTX)) {
+        if (!CFReadStreamSetClient(m_readStream, kCFStreamEventHasBytesAvailable
+                                   | kCFStreamEventEndEncountered
+                                   | kCFStreamEventErrorOccurred, readCallBack, &CTX)) {
             CFRelease(m_readStream), m_readStream = 0;
             goto out;
         }
@@ -199,8 +189,7 @@ namespace astreamer {
         return success;
     }
     
-    void HTTP_Stream::close()
-    {
+    void HTTP_Stream::close() {
         /* The stream has been already closed */
         if (!m_readStream) {
             return;
@@ -212,8 +201,7 @@ namespace astreamer {
         CFRelease(m_readStream), m_readStream = 0;
     }
     
-    void HTTP_Stream::setScheduledInRunLoop(bool scheduledInRunLoop)
-    {
+    void HTTP_Stream::setScheduledInRunLoop(bool scheduledInRunLoop) {
         /* The stream has not been opened, or it has been already closed */
         if (!m_readStream) {
             return;
@@ -239,8 +227,7 @@ namespace astreamer {
         m_scheduledInRunLoop = scheduledInRunLoop;
     }
     
-    void HTTP_Stream::setUrl(CFURLRef url)
-    {
+    void HTTP_Stream::setUrl(CFURLRef url) {
         if (m_url) {
             CFRelease(m_url);
         }
@@ -251,8 +238,7 @@ namespace astreamer {
         }
     }
     
-    void HTTP_Stream::id3metaDataAvailable(std::map<CFStringRef,CFStringRef> metaData)
-    {
+    void HTTP_Stream::id3metaDataAvailable(std::map<CFStringRef,CFStringRef> metaData) {
         if (m_delegate) {
             m_delegate->streamMetaDataAvailable(metaData);
         }
@@ -260,15 +246,15 @@ namespace astreamer {
     
     /* private */
     
-    CFReadStreamRef HTTP_Stream::createReadStream(CFURLRef url)
-    {
+    CFReadStreamRef HTTP_Stream::createReadStream(CFURLRef url) {
         CFReadStreamRef readStream = 0;
         CFHTTPMessageRef request = 0;
         CFDictionaryRef proxySettings = 0;
         
         Stream_Configuration *config = Stream_Configuration::configuration();
         
-        if (!(request = CFHTTPMessageCreateRequest(kCFAllocatorDefault, httpRequestMethod, url, kCFHTTPVersion1_1))) {
+        if (!(request = CFHTTPMessageCreateRequest(kCFAllocatorDefault,
+                                                   httpRequestMethod, url, kCFHTTPVersion1_1))) {
             goto out;
         }
         
@@ -288,18 +274,20 @@ namespace astreamer {
             CFHTTPMessageSetHeaderFieldValue(request, httpRangeHeader, rangeHeaderValue);
             CFRelease(rangeHeaderValue);
         }
-
+        
         if (!(readStream = CFReadStreamCreateForHTTPRequest(kCFAllocatorDefault, request))) {
             goto out;
         }
+        
+        CFReadStreamSetProperty(readStream,
+                                kCFStreamPropertyHTTPShouldAutoredirect,
+                                kCFBooleanTrue);
         
         proxySettings = CFNetworkCopySystemProxySettings();
         if (proxySettings) {
             CFReadStreamSetProperty(readStream, kCFStreamPropertyHTTPProxy, proxySettings);
             CFRelease(proxySettings);
         }
-        
-        CFReadStreamSetProperty(readStream, kCFStreamPropertyHTTPShouldAutoredirect, kCFBooleanTrue);
         
     out:
         if (request) {
@@ -309,8 +297,7 @@ namespace astreamer {
         return readStream;
     }
     
-    void HTTP_Stream::parseHttpHeadersIfNeeded(const UInt8 *buf, const CFIndex bufSize)
-    {
+    void HTTP_Stream::parseHttpHeadersIfNeeded(const UInt8 *buf, const CFIndex bufSize) {
         if (m_httpHeadersParsed) {
             return;
         }
@@ -335,7 +322,8 @@ namespace astreamer {
         
         HS_TRACE("A regular HTTP stream\n");
         
-        CFHTTPMessageRef response = (CFHTTPMessageRef)CFReadStreamCopyProperty(m_readStream, kCFStreamPropertyHTTPResponseHeader);
+        CFHTTPMessageRef response = (CFHTTPMessageRef)CFReadStreamCopyProperty(m_readStream,
+                                                                               kCFStreamPropertyHTTPResponseHeader);
         if (response) {
             /*
              * If the server responded with the icy-metaint header, the response
@@ -392,8 +380,7 @@ namespace astreamer {
         }
     }
     
-    void HTTP_Stream::parseICYStream(const UInt8 *buf, const CFIndex bufSize)
-    {
+    void HTTP_Stream::parseICYStream(const UInt8 *buf, const CFIndex bufSize) {
         HS_TRACE("Parsing an IceCast stream, received %li bytes\n", bufSize);
         
         CFIndex offset = 0;
@@ -408,7 +395,7 @@ namespace astreamer {
                         
                         bytesFound = 0;
                         
-                        HS_TRACE_CFSTRING(m_icyHeaderLines[m_icyHeaderLines.size()-1]);
+                        HS_TRACE_CFSTRING(m_icyHeaderLines[m_icyHeaderLines.size() - 1]);
                         
                         continue;
                     }
@@ -456,8 +443,7 @@ namespace astreamer {
                     if (m_contentType) {
                         CFRelease(m_contentType), m_contentType = 0;
                     }
-                    m_contentType = CFStringCreateWithSubstring(kCFAllocatorDefault,
-                                                                line,
+                    m_contentType = CFStringCreateWithSubstring(kCFAllocatorDefault, line,
                                                                 CFRangeMake(icyContenTypeHeaderLength, lineLength - icyContenTypeHeaderLength));
                     
                 }
@@ -466,8 +452,7 @@ namespace astreamer {
                                                icyMetaDataHeader,
                                                CFRangeMake(0, icyMetaDataHeaderLength),
                                                0) == kCFCompareEqualTo) {
-                    CFStringRef metadataInterval = CFStringCreateWithSubstring(kCFAllocatorDefault,
-                                                                               line,
+                    CFStringRef metadataInterval = CFStringCreateWithSubstring(kCFAllocatorDefault, line,
                                                                                CFRangeMake(icyMetaDataHeaderLength, lineLength - icyMetaDataHeaderLength));
                     
                     if (metadataInterval) {
@@ -552,12 +537,11 @@ namespace astreamer {
                                                                                     token,
                                                                                     keyRange);
                                 
-                                CFRange valueRange = CFRangeMake(foundRange.location + 2, CFStringGetLength(token) - keyRange.length - 3);
+                                CFRange valueRange = CFRangeMake(foundRange.location + 2,
+                                                                 CFStringGetLength(token) - keyRange.length - 3);
                                 
-                                CFStringRef metadaValue = CFStringCreateWithSubstring(kCFAllocatorDefault,
-                                                                                      token,
-                                                                                      valueRange);
-                                
+                                CFStringRef metadaValue = CFStringCreateWithSubstring(kCFAllocatorDefault, token, valueRange);
+
                                 metadataMap[metadaKey] = metadaValue;
                             }
                         }
@@ -602,8 +586,7 @@ namespace astreamer {
 #define TRY_ENCODING(STR,ENC) STR = CFStringCreateWithBytes(kCFAllocatorDefault, bytes, numBytes, ENC, false); \
 if (STR != NULL) { return STR; }
     
-    CFStringRef HTTP_Stream::createMetaDataStringWithMostReasonableEncoding(const UInt8 *bytes, const CFIndex numBytes)
-    {
+    CFStringRef HTTP_Stream::createMetaDataStringWithMostReasonableEncoding(const UInt8 *bytes, const CFIndex numBytes) {
         CFStringRef metaData;
         
         TRY_ENCODING(metaData, kCFStringEncodingUTF8);
@@ -631,6 +614,9 @@ if (STR != NULL) { return STR; }
         TRY_ENCODING(metaData, kCFStringEncodingWindowsArabic);
         TRY_ENCODING(metaData, kCFStringEncodingKOI8_R);
         TRY_ENCODING(metaData, kCFStringEncodingBig5);
+        TRY_ENCODING(metaData, kCFStringEncodingGB_2312_80);
+        TRY_ENCODING(metaData, kCFStringEncodingGBK_95);
+        TRY_ENCODING(metaData, kCFStringEncodingGB_18030_2000);
         TRY_ENCODING(metaData, kCFStringEncodingASCII);
         
         return metaData;
@@ -638,8 +624,7 @@ if (STR != NULL) { return STR; }
     
 #undef TRY_ENCODING
     
-    void HTTP_Stream::readCallBack(CFReadStreamRef stream, CFStreamEventType eventType, void *clientCallBackInfo)
-    {
+    void HTTP_Stream::readCallBack(CFReadStreamRef stream, CFStreamEventType eventType, void *clientCallBackInfo) {
         HTTP_Stream *THIS = static_cast<HTTP_Stream*>(clientCallBackInfo);
         
         Stream_Configuration *config = Stream_Configuration::configuration();

@@ -29,7 +29,7 @@
 #endif
 
 namespace astreamer {
-    
+
     typedef struct queued_packet {
         AudioStreamPacketDescription desc;
         struct queued_packet *next;
@@ -50,8 +50,8 @@ namespace astreamer {
     m_waitingOnBuffer(false),
     m_queuedHead(0),
     m_queuedTail(0),
-    m_lastError(noErr)
-    {
+    m_lastError(noErr),
+    m_initialOutputVolume(1.0) {
         Stream_Configuration *config = Stream_Configuration::configuration();
         
         m_audioQueueBuffer = new AudioQueueBufferRef[config->bufferCount];
@@ -63,8 +63,7 @@ namespace astreamer {
         }
     }
     
-    Audio_Queue::~Audio_Queue()
-    {
+    Audio_Queue::~Audio_Queue() {
         stop(true);
         
         cleanup();
@@ -74,13 +73,11 @@ namespace astreamer {
         delete [] m_bufferInUse;
     }
     
-    bool Audio_Queue::initialized()
-    {
+    bool Audio_Queue::initialized() {
         return (m_outAQ != 0);
     }
     
-    void Audio_Queue::start()
-    {
+    void Audio_Queue::start() {
         // start the queue if it has not been started already
         if (m_audioQueueStarted) {
             return;
@@ -96,8 +93,7 @@ namespace astreamer {
         }
     }
     
-    void Audio_Queue::pause()
-    {
+    void Audio_Queue::pause() {
         if (m_state == RUNNING) {
             if (AudioQueuePause(m_outAQ) != 0) {
                 AQ_TRACE("%s: AudioQueuePause failed!\n", __PRETTY_FUNCTION__);
@@ -109,21 +105,54 @@ namespace astreamer {
         }
     }
     
-    void Audio_Queue::stop()
-    {
+    void Audio_Queue::stop() {
         stop(true);
     }
     
-    void Audio_Queue::setVolume(float volume)
-    {
+    float Audio_Queue::volume() {
+        if (!m_outAQ) {
+            return 1.0;
+        }
+        
+        float vol;
+        
+        OSStatus err = AudioQueueGetParameter(m_outAQ, kAudioQueueParam_Volume, &vol);
+        
+        if (!err) {
+            return vol;
+        }
+        
+        return 1.0;
+    }
+    
+    void Audio_Queue::setVolume(float volume) {
         if (!m_outAQ) {
             return;
         }
         AudioQueueSetParameter(m_outAQ, kAudioQueueParam_Volume, volume);
     }
     
-    void Audio_Queue::stop(bool stopImmediately)
-    {
+    void Audio_Queue::setPlayRate(float playRate) {
+        if (!m_outAQ) {
+            return;
+        }
+        UInt32 enableTimePitchConversion = (playRate != 1.0);
+        
+        if (playRate < 0.5) {
+            playRate = 0.5;
+        }
+        if (playRate > 2.0) {
+            playRate = 2.0;
+        }
+        
+        AudioQueueSetProperty (m_outAQ,
+                               kAudioQueueProperty_EnableTimePitch,
+                               &enableTimePitchConversion,
+                               sizeof(enableTimePitchConversion));
+        AudioQueueSetParameter(m_outAQ, kAudioQueueParam_PlayRate, playRate);
+    }
+    
+    void Audio_Queue::stop(bool stopImmediately) {
         if (!m_audioQueueStarted) {
             AQ_TRACE("%s: audio queue already stopped, return!\n", __PRETTY_FUNCTION__);
             return;
@@ -143,9 +172,9 @@ namespace astreamer {
                                              this);
         }
         
-//        if (AudioQueueStop(m_outAQ, stopImmediately) != 0) {
-//            AQ_TRACE("%s: AudioQueueStop failed!\n", __PRETTY_FUNCTION__);
-//        }
+        if (AudioQueueStop(m_outAQ, stopImmediately) != 0) {
+            AQ_TRACE("%s: AudioQueueStop failed!\n", __PRETTY_FUNCTION__);
+        }
         
         if (stopImmediately) {
             setState(IDLE);
@@ -154,8 +183,7 @@ namespace astreamer {
         AQ_TRACE("%s: leave\n", __PRETTY_FUNCTION__);
     }
     
-    unsigned Audio_Queue::timePlayedInSeconds()
-    {
+    unsigned Audio_Queue::timePlayedInSeconds() {
         unsigned timePlayed = 0;
         
         AudioTimeStamp queueTime;
@@ -172,31 +200,13 @@ namespace astreamer {
         return timePlayed;
     }
     
-    double Audio_Queue::timePlayedInSecondsDouble() {
-        double timePlayed = 0;
-        AudioTimeStamp queueTime;
-        Boolean discontinuity;
-        
-        OSStatus err = AudioQueueGetCurrentTime(m_outAQ, NULL, &queueTime, &discontinuity);
-        if (err) {
-            goto out;
-        }
-        
-        timePlayed = queueTime.mSampleTime / m_streamDesc.mSampleRate;
-        
-    out:
-        return timePlayed;
-    }
-    
-    void Audio_Queue::handlePropertyChange(AudioFileStreamID inAudioFileStream, AudioFileStreamPropertyID inPropertyID, UInt32 *ioFlags)
-    {
+    void Audio_Queue::handlePropertyChange(AudioFileStreamID inAudioFileStream, AudioFileStreamPropertyID inPropertyID, UInt32 *ioFlags) {
         OSStatus err = noErr;
         
         AQ_TRACE("found property '%u%u%u%u'\n", (inPropertyID>>24)&255, (inPropertyID>>16)&255, (inPropertyID>>8)&255, inPropertyID&255);
         
         switch (inPropertyID) {
-            case kAudioFileStreamProperty_ReadyToProducePackets:
-            {
+            case kAudioFileStreamProperty_ReadyToProducePackets: {
                 cleanup();
                 
                 // create the audio queue
@@ -240,11 +250,18 @@ namespace astreamer {
                 }
                 
                 // listen for kAudioQueueProperty_IsRunning
-                err = AudioQueueAddPropertyListener(m_outAQ, kAudioQueueProperty_IsRunning, audioQueueIsRunningCallback, this);
+                err = AudioQueueAddPropertyListener(m_outAQ,
+                                                    kAudioQueueProperty_IsRunning,
+                                                    audioQueueIsRunningCallback,
+                                                    this);
                 if (err) {
                     AQ_TRACE("%s: error in AudioQueueAddPropertyListener\n", __PRETTY_FUNCTION__);
                     m_lastError = err;
                     break;
+                }
+                
+                if (m_initialOutputVolume != 1.0) {
+                    setVolume(m_initialOutputVolume);
                 }
                 
                 break;
@@ -252,8 +269,10 @@ namespace astreamer {
         }
     }
     
-    void Audio_Queue::handleAudioPackets(UInt32 inNumberBytes, UInt32 inNumberPackets, const void *inInputData, AudioStreamPacketDescription *inPacketDescriptions)
-    {
+    void Audio_Queue::handleAudioPackets(UInt32 inNumberBytes,
+                                         UInt32 inNumberPackets,
+                                         const void *inInputData,
+                                         AudioStreamPacketDescription *inPacketDescriptions) {
         if (!initialized()) {
             AQ_TRACE("%s: warning: attempt to handle audio packets with uninitialized audio queue. return.\n", __PRETTY_FUNCTION__);
             
@@ -297,8 +316,7 @@ namespace astreamer {
         }
     }
     
-    int Audio_Queue::handlePacket(const void *data, AudioStreamPacketDescription *desc)
-    {
+    int Audio_Queue::handlePacket(const void *data, AudioStreamPacketDescription *desc) {
         if (!initialized()) {
             AQ_TRACE("%s: warning: attempt to handle audio packets with uninitialized audio queue. return.\n", __PRETTY_FUNCTION__);
             
@@ -327,7 +345,10 @@ namespace astreamer {
                 return hasFreeBuffer;
             }
         } else {
-            AQ_TRACE("%s: skipped enqueueBuffer AQ_BUFSIZ - m_bytesFilled %lu, packetSize %u\n", __PRETTY_FUNCTION__, (config->bufferSize - m_bytesFilled), (unsigned int)packetSize);
+            AQ_TRACE("%s: skipped enqueueBuffer AQ_BUFSIZ - m_bytesFilled %lu, packetSize %u\n",
+                     __PRETTY_FUNCTION__,
+                     (config->bufferSize - m_bytesFilled),
+                     (unsigned int)packetSize);
         }
         
         // copy data to the audio queue buffer
@@ -351,11 +372,10 @@ namespace astreamer {
     
     /* private */
     
-    void Audio_Queue::cleanup()
-    {
+    void Audio_Queue::cleanup() {
         if (!initialized()) {
-            AQ_TRACE("%s: warning: attempt to cleanup an uninitialized audio queue. return.\n", __PRETTY_FUNCTION__);
-            
+            AQ_TRACE("%s: warning: attempt to cleanup an uninitialized audio queue. return.\n",
+                     __PRETTY_FUNCTION__);
             return;
         }
         
@@ -370,7 +390,7 @@ namespace astreamer {
                                              audioQueueIsRunningCallback,
                                              this);
             
-//            AudioQueueStop(m_outAQ, true);
+            AudioQueueStop(m_outAQ, true);
             setState(IDLE);
         }
         
@@ -396,8 +416,7 @@ namespace astreamer {
         m_lastError = noErr;
     }
     
-    void Audio_Queue::setState(State state)
-    {
+    void Audio_Queue::setState(State state) {
         if (m_state == state) {
             /* We are already in this state! */
             return;
@@ -410,8 +429,7 @@ namespace astreamer {
         }
     }
     
-    int Audio_Queue::enqueueBuffer()
-    {
+    int Audio_Queue::enqueueBuffer() {
         AQ_ASSERT(!m_bufferInUse[m_fillBufferIndex]);
         
         Stream_Configuration *config = Stream_Configuration::configuration();
@@ -461,8 +479,7 @@ namespace astreamer {
         return 1;
     }
     
-    int Audio_Queue::findQueueBuffer(AudioQueueBufferRef inBuffer)
-    {
+    int Audio_Queue::findQueueBuffer(AudioQueueBufferRef inBuffer) {
         Stream_Configuration *config = Stream_Configuration::configuration();
         
         for (unsigned int i = 0; i < config->bufferCount; ++i) {
@@ -474,8 +491,7 @@ namespace astreamer {
         return -1;
     }
     
-    void Audio_Queue::enqueueCachedData()
-    {
+    void Audio_Queue::enqueueCachedData() {
         AQ_ASSERT(!m_waitingOnBuffer);
         AQ_ASSERT(!m_bufferInUse[m_fillBufferIndex]);
         
@@ -504,8 +520,9 @@ namespace astreamer {
     
     // this is called by the audio queue when it has finished decoding our data. 
     // The buffer is now free to be reused.
-    void Audio_Queue::audioQueueOutputCallback(void *inClientData, AudioQueueRef inAQ, AudioQueueBufferRef inBuffer)
-    {
+    void Audio_Queue::audioQueueOutputCallback(void *inClientData,
+                                               AudioQueueRef inAQ,
+                                               AudioQueueBufferRef inBuffer) {
         Audio_Queue *audioQueue = static_cast<Audio_Queue*>(inClientData);    
         unsigned int bufIndex = audioQueue->findQueueBuffer(inBuffer);
         
@@ -513,6 +530,10 @@ namespace astreamer {
         
         audioQueue->m_bufferInUse[bufIndex] = false;
         audioQueue->m_buffersUsed--;
+        
+        if (audioQueue->m_delegate) {
+            audioQueue->m_delegate->audioQueueFinishedPlayingPacket();
+        }
         
         if (audioQueue->m_buffersUsed == 0 && !audioQueue->m_queuedHead && audioQueue->m_delegate) {
             audioQueue->m_delegate->audioQueueBuffersEmpty();
@@ -522,8 +543,9 @@ namespace astreamer {
         }
     }
     
-    void Audio_Queue::audioQueueIsRunningCallback(void *inClientData, AudioQueueRef inAQ, AudioQueuePropertyID inID)
-    {
+    void Audio_Queue::audioQueueIsRunningCallback(void *inClientData,
+                                                  AudioQueueRef inAQ,
+                                                  AudioQueuePropertyID inID) {
         Audio_Queue *audioQueue = static_cast<Audio_Queue*>(inClientData);
         
         AQ_TRACE("%s: enter\n", __PRETTY_FUNCTION__);

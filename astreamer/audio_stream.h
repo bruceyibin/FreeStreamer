@@ -44,6 +44,7 @@ namespace astreamer {
             STOPPED,
             BUFFERING,
             PLAYING,
+            PAUSED,
             SEEKING,
             FAILED,
             END_OF_FILE
@@ -58,22 +59,19 @@ namespace astreamer {
         void pause();
         
         unsigned timePlayedInSeconds();
-        double timePlayedInSecondsDouble();
         unsigned durationInSeconds();
-        double durationInSecondsDouble();
         void seekToTime(unsigned newSeekTime);
-        void seekToTimeDouble(double newSeekTime);
         
         HTTP_Stream_Position streamPositionForTime(unsigned newSeekTime);
-        HTTP_Stream_Position streamPositionForTimeDouble(double newSeekTime);
         
         void setVolume(float volume);
+        void setPlayRate(float playRate);
         
         void setUrl(CFURLRef url);
         void setStrictContentTypeChecking(bool strictChecking);
         void setDefaultContentType(CFStringRef defaultContentType);
-        void setSeekPosition(double seekPosition);
-        void setContentLength(size_t contentLength);
+        void setSeekPosition(unsigned seekPosition);
+        void setContentLength(UInt64 contentLength);
         
         void setOutputFile(CFURLRef url);
         CFURLRef outputFile();
@@ -83,12 +81,15 @@ namespace astreamer {
         CFStringRef sourceFormatDescription();
         CFStringRef contentType();
         
+        size_t cachedDataSize();
+        
         /* Audio_Queue_Delegate */
         void audioQueueStateChanged(Audio_Queue::State state);
         void audioQueueBuffersEmpty();
         void audioQueueOverflow();
         void audioQueueUnderflow();
         void audioQueueInitializationFailed();
+        void audioQueueFinishedPlayingPacket();
         
         /* HTTP_Stream_Delegate */
         void streamIsReadyRead();
@@ -105,16 +106,15 @@ namespace astreamer {
         bool m_httpStreamRunning;
         bool m_audioStreamParserRunning;
         
-        size_t m_contentLength;
+        UInt64 m_contentLength;
         
         State m_state;
         HTTP_Stream *m_httpStream;
         Audio_Queue *m_audioQueue;
         
         CFRunLoopTimerRef m_watchdogTimer;
-        CFRunLoopTimerRef m_playbackStopTimer;
         
-        AudioFileStreamID m_audioFileStream;	// the audio file stream parser
+        AudioFileStreamID m_audioFileStream;  // the audio file stream parser
         AudioConverterRef m_audioConverter;
         AudioStreamBasicDescription m_srcFormat;
         AudioStreamBasicDescription m_dstFormat;
@@ -124,7 +124,7 @@ namespace astreamer {
         UInt8 *m_outputBuffer;
         
         UInt64 m_dataOffset;
-        double m_seekPosition;
+        unsigned m_seekPosition;
         size_t m_bounceCount;
         CFAbsoluteTime m_firstBufferingTime;
         
@@ -141,30 +141,47 @@ namespace astreamer {
         
         std::list <queued_packet_t*> m_processedPackets;
         
-        UInt32 m_processedPacketsCount;      // global packet statistics: count
+        size_t m_cachedDataSize;
+        
+        UInt32 m_processedPacketsCount;  // global packet statistics: count
         UInt64 m_audioDataByteCount;
         
         double m_packetDuration;
         double m_bitrateBuffer[kAudioStreamBitrateBufferSize];
         size_t m_bitrateBufferIndex;
         
+        float m_outputVolume;
+        
+        bool m_queueCanAcceptPackets;
+        
         Audio_Queue *audioQueue();
         void closeAudioQueue();
         
-        size_t contentLength();
+        UInt64 contentLength();
         void closeAndSignalError(int error);
         void setState(State state);
         void setCookiesForStream(AudioFileStreamID inAudioFileStream);
         unsigned bitrate();
-        double bitrateDouble();
+        
+        int cachedDataCount();
+        void enqueueCachedData(int minPacketsRequired);
         
         static void watchdogTimerCallback(CFRunLoopTimerRef timer, void *info);
-        static void playbackStopTimerCallback(CFRunLoopTimerRef timer, void *info);
         
-        static OSStatus encoderDataCallback(AudioConverterRef inAudioConverter, UInt32 *ioNumberDataPackets, AudioBufferList *ioData, AudioStreamPacketDescription **outDataPacketDescription, void *inUserData);
-        static void propertyValueCallback(void *inClientData, AudioFileStreamID inAudioFileStream, AudioFileStreamPropertyID inPropertyID, UInt32 *ioFlags);
-        static void streamDataCallback(void *inClientData, UInt32 inNumberBytes, UInt32 inNumberPackets, const void *inInputData, AudioStreamPacketDescription *inPacketDescriptions);
-        
+        static OSStatus encoderDataCallback(AudioConverterRef inAudioConverter,
+                                            UInt32 *ioNumberDataPackets,
+                                            AudioBufferList *ioData,
+                                            AudioStreamPacketDescription **outDataPacketDescription,
+                                            void *inUserData);
+        static void propertyValueCallback(void *inClientData,
+                                          AudioFileStreamID inAudioFileStream,
+                                          AudioFileStreamPropertyID inPropertyID,
+                                          UInt32 *ioFlags);
+        static void streamDataCallback(void *inClientData,
+                                       UInt32 inNumberBytes,
+                                       UInt32 inNumberPackets,
+                                       const void *inInputData,
+                                       AudioStreamPacketDescription *inPacketDescriptions);
         AudioFileTypeID audioStreamTypeFromContentType(CFStringRef contentType);
     };
     

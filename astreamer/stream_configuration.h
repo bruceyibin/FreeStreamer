@@ -24,6 +24,7 @@ namespace astreamer {
         int bounceInterval;
         int maxBounceCount;
         int startupWatchdogPeriod;
+        int maxPrebufferedByteCount;
         CFStringRef userAgent;
         
         static Stream_Configuration *configuration();

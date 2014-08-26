@@ -35,8 +35,13 @@ namespace astreamer {
         
         bool initialized();
         
-        void handlePropertyChange(AudioFileStreamID inAudioFileStream, AudioFileStreamPropertyID inPropertyID, UInt32 *ioFlags);
-        void handleAudioPackets(UInt32 inNumberBytes, UInt32 inNumberPackets, const void *inInputData, AudioStreamPacketDescription *inPacketDescriptions);
+        void handlePropertyChange(AudioFileStreamID inAudioFileStream,
+                                  AudioFileStreamPropertyID inPropertyID,
+                                  UInt32 *ioFlags);
+        void handleAudioPackets(UInt32 inNumberBytes,
+                                UInt32 inNumberPackets,
+                                const void *inInputData,
+                                AudioStreamPacketDescription *inPacketDescriptions);
         int handlePacket(const void *data, AudioStreamPacketDescription *desc);
         
         void start();
@@ -44,10 +49,12 @@ namespace astreamer {
         void stop(bool stopImmediately);
         void stop();
         
+        float volume();
+        
         void setVolume(float volume);
+        void setPlayRate(float playRate);
         
         unsigned timePlayedInSeconds();
-        double timePlayedInSecondsDouble();
         
     private:
         Audio_Queue(const Audio_Queue&);
@@ -75,6 +82,7 @@ namespace astreamer {
     public:
         OSStatus m_lastError;
         AudioStreamBasicDescription m_streamDesc;
+        float m_initialOutputVolume;
         
     private:
         void cleanup();
@@ -84,8 +92,12 @@ namespace astreamer {
         int findQueueBuffer(AudioQueueBufferRef inBuffer);
         void enqueueCachedData();
         
-        static void audioQueueOutputCallback(void *inClientData, AudioQueueRef inAQ, AudioQueueBufferRef inBuffer);
-        static void audioQueueIsRunningCallback(void *inClientData, AudioQueueRef inAQ, AudioQueuePropertyID inID);
+        static void audioQueueOutputCallback(void *inClientData,
+                                             AudioQueueRef inAQ,
+                                             AudioQueueBufferRef inBuffer);
+        static void audioQueueIsRunningCallback(void *inClientData,
+                                                AudioQueueRef inAQ,
+                                                AudioQueuePropertyID inID);
     };
     
     class Audio_Queue_Delegate {
@@ -95,6 +107,7 @@ namespace astreamer {
         virtual void audioQueueOverflow() = 0;
         virtual void audioQueueUnderflow() = 0;
         virtual void audioQueueInitializationFailed() = 0;
+        virtual void audioQueueFinishedPlayingPacket() = 0;
     };
     
 } // namespace astreamer

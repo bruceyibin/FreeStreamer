@@ -16,7 +16,7 @@ namespace astreamer {
     class File_Output  {
     private:
         File_Output(const File_Output&);
-        File_Output& operator=(const File_Output&);
+        File_Output &operator = (const File_Output&);
         
         CFWriteStreamRef m_writeStream;
         

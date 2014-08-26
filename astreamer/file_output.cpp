@@ -11,19 +11,16 @@
 namespace astreamer {
     
     File_Output::File_Output(CFURLRef fileURL) :
-    m_writeStream(CFWriteStreamCreateWithFile(kCFAllocatorDefault, fileURL))
-    {
+    m_writeStream(CFWriteStreamCreateWithFile(kCFAllocatorDefault, fileURL)) {
         CFWriteStreamOpen(m_writeStream);
     }
     
-    File_Output::~File_Output()
-    {
+    File_Output::~File_Output() {
         CFWriteStreamClose(m_writeStream);
         CFRelease(m_writeStream);
     }
     
-    CFIndex File_Output::write(const UInt8 *buffer, CFIndex bufferLength)
-    {
+    CFIndex File_Output::write(const UInt8 *buffer, CFIndex bufferLength) {
         return CFWriteStreamWrite(m_writeStream, buffer, bufferLength);
     }
     

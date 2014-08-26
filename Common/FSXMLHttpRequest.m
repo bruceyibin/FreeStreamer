@@ -22,8 +22,7 @@
 
 @implementation FSXMLHttpRequest
 
-- (id)init
-{
+- (id)init {
     self = [super init];
     if (self) {
         _dateFormatter = [[NSDateFormatter alloc] init];
@@ -31,13 +30,11 @@
     return self;
 }
 
-- (void)dealloc
-{
+- (void)dealloc {
     _receivedData = nil;
 }
 
-- (void)start
-{
+- (void)start {
     if (_connection) {
         return;
     }
@@ -63,8 +60,7 @@
     }
 }
 
-- (void)cancel
-{
+- (void)cancel {
     if (!_connection) {
         return;
     }
@@ -80,21 +76,18 @@
  * =======================================
  */
 
-- (void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response
-{
+- (void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response {
     NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
     _httpStatus = [httpResponse statusCode];
     
     [_receivedData setLength:0];
 }
 
-- (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data
-{
+- (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data {
     [_receivedData appendData:data];
 }
 
-- (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error
-{
+- (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error {
     @synchronized (self) {
         assert(_connection == connection);
         _connection = nil;
@@ -110,8 +103,7 @@
     self.onFailure();
 }
 
-- (void)connectionDidFinishLoading:(NSURLConnection *)connection
-{
+- (void)connectionDidFinishLoading:(NSURLConnection *)connection {
     assert(_connection == connection);
     
     @synchronized (self) {
@@ -161,8 +153,7 @@
  * =======================================
  */
 
-- (NSArray *)performXPathQuery:(NSString *)query
-{
+- (NSArray *)performXPathQuery:(NSString *)query {
     NSMutableArray *resultNodes = [NSMutableArray array];
     xmlXPathContextPtr xpathCtx = NULL; 
     xmlXPathObjectPtr xpathObj = NULL;
@@ -196,8 +187,7 @@ cleanup:
     return resultNodes;
 }
 
-- (NSString *)contentForNode:(xmlNodePtr)node
-{
+- (NSString *)contentForNode:(xmlNodePtr)node{
     NSString *stringWithContent;
     if (!node) {
         stringWithContent = [[NSString alloc] init];
@@ -212,8 +202,7 @@ cleanup:
     return stringWithContent;
 }
 
-- (NSString *)contentForNodeAttribute:(xmlNodePtr)node attribute:(const char *)attr
-{
+- (NSString *)contentForNodeAttribute:(xmlNodePtr)node attribute:(const char *)attr {
     NSString *stringWithContent;
     if (!node) {
         stringWithContent = [[NSString alloc] init];
@@ -234,8 +223,7 @@ cleanup:
  * =======================================
  */
 
-- (const char *)detectEncoding
-{
+- (const char *)detectEncoding {
     const char *encoding = 0;
     const char *header = strndup([_receivedData bytes], 60);
     
@@ -249,8 +237,7 @@ cleanup:
     return encoding;
 }
 
-- (NSDate *)dateFromNode:(xmlNodePtr)node
-{
+- (NSDate *)dateFromNode:(xmlNodePtr)node {
     NSString *dateString = [self contentForNode:node];
     
     /*

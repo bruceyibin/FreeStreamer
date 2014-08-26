@@ -10,8 +10,7 @@
 
 @implementation FSPlaylistItem
 
-- (NSURL *)nsURL
-{
+- (NSURL *)nsURL {
     if (self.url) {
         return [NSURL URLWithString:self.url];
     }
@@ -21,8 +20,7 @@
     return nil;
 }
 
-- (BOOL)isEqual:(id)anObject
-{
+- (BOOL)isEqual:(id)anObject {
     FSPlaylistItem *otherObject = anObject;
     
     if ([otherObject.title isEqual:self.title] &&

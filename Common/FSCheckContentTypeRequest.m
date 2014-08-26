@@ -14,8 +14,7 @@
 
 @implementation FSCheckContentTypeRequest
 
-- (id)init
-{
+- (id)init {
     self = [super init];
     if (self) {
         _format = kFSFileFormatUnknown;
@@ -25,8 +24,7 @@
     return self;
 }
 
-- (void)start
-{
+- (void)start {
     if (_connection) {
         return;
     }
@@ -42,12 +40,6 @@
     
     @synchronized (self) {
         _connection = [[NSURLConnection alloc] initWithRequest:request delegate:self];
-        DLog(@"%@", _connection);
-    }
-    finished = NO;
-    while (!finished)
-    {
-        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];
     }
     
     if (!_connection) {
@@ -60,8 +52,7 @@
     }
 }
 
-- (void)cancel
-{
+- (void)cancel {
     if (!_connection) {
         return;
     }
@@ -77,23 +68,19 @@
  * =======================================
  */
 
-- (FSFileFormat)format
-{
+- (FSFileFormat)format {
     return _format;
 }
 
-- (NSString *)contentType
-{
+- (NSString *)contentType {
     return _contentType;
 }
 
-- (BOOL)playlist
-{
+- (BOOL)playlist {
     return _playlist;
 }
 
-- (BOOL)xml
-{
+- (BOOL)xml {
     return _xml;
 }
 
@@ -103,8 +90,7 @@
  * =======================================
  */
 
-- (void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response
-{
+- (void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response {
     _contentType = response.MIMEType;
     
     _format = kFSFileFormatUnknown;
@@ -149,13 +135,11 @@
     self.onCompletion();
 }
 
-- (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data
-{
+- (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data {
     // Do nothing
 }
 
-- (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error
-{
+- (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error {
     @synchronized (self) {
         _connection = nil;
         _format = kFSFileFormatUnknown;
@@ -174,11 +158,8 @@
     }
 }
 
-- (void)connectionDidFinishLoading:(NSURLConnection *)connection
-{
+- (void)connectionDidFinishLoading:(NSURLConnection *)connection {
     // Do nothing
-    finished = YES;
-    _connection = nil;
 }
 
 /*
@@ -187,8 +168,7 @@
  * =======================================
  */
 
-- (BOOL)guessContentTypeByUrl:(NSURLResponse *)response
-{
+- (BOOL)guessContentTypeByUrl:(NSURLResponse *)response {
     /* The server did not provide meaningful content type;
      last resort: check the file suffix, if there is one */
     

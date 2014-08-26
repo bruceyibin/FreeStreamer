@@ -17,8 +17,7 @@ static NSString *const kXPathQueryItems = @"/rss/channel/item";
 
 @implementation FSParseRssPodcastFeedRequest
 
-- (void)parseItems:(xmlNodePtr)node
-{
+- (void)parseItems:(xmlNodePtr)node {
     FSPlaylistItem *item = [[FSPlaylistItem alloc] init];
     
     for (xmlNodePtr n = node->children; n != NULL; n = n->next) {
@@ -41,8 +40,7 @@ static NSString *const kXPathQueryItems = @"/rss/channel/item";
     [_playlistItems addObject:item];
 }
 
-- (void)parseResponseData
-{
+- (void)parseResponseData {
     if (!_playlistItems) {
         _playlistItems = [[NSMutableArray alloc] init];
     }
@@ -56,15 +54,13 @@ static NSString *const kXPathQueryItems = @"/rss/channel/item";
     [self performXPathQuery:kXPathQueryItems];
 }
 
-- (void)parseXMLNode:(xmlNodePtr)node xPathQuery:(NSString *)xPathQuery
-{
+- (void)parseXMLNode:(xmlNodePtr)node xPathQuery:(NSString *)xPathQuery {
     if ([xPathQuery isEqualToString:kXPathQueryItems]) {
         [self parseItems:node];
     }
 }
 
-- (NSArray *)playlistItems
-{
+- (NSArray *)playlistItems {
     return _playlistItems;
 }
 

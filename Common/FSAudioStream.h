@@ -12,17 +12,17 @@
 /**
  * The major version of the current release.
  */
-#define FREESTREAMER_VERSION_MAJOR          2
+#define FREESTREAMER_VERSION_MAJOR 2
 
 /**
  * The minor version of the current release.
  */
-#define FREESTREAMER_VERSION_MINOR          3
+#define FREESTREAMER_VERSION_MINOR 4
 
 /**
  * The reversion of the current release
  */
-#define FREESTREAMER_VERSION_REVISION       1
+#define FREESTREAMER_VERSION_REVISION 3
 
 /**
  * Follow this notification for the audio stream state changes.
@@ -50,6 +50,7 @@ typedef enum {
     kFsAudioStreamStopped,
     kFsAudioStreamBuffering,
     kFsAudioStreamPlaying,
+    kFsAudioStreamPaused,
     kFsAudioStreamSeeking,
     kFSAudioStreamEndOfFile,
     kFsAudioStreamFailed
@@ -116,23 +117,27 @@ typedef struct {
 /**
  * The output sample rate.
  */
-@property (nonatomic,assign) double   outputSampleRate;
+@property (nonatomic,assign) double outputSampleRate;
 /**
  * The number of output channels.
  */
-@property (nonatomic,assign) long     outputNumChannels;
+@property (nonatomic,assign) long outputNumChannels;
 /**
  * The interval within the stream may enter to the buffering state before it fails.
  */
-@property (nonatomic,assign) int      bounceInterval;
+@property (nonatomic,assign) int bounceInterval;
 /**
  * The number of times the stream may enter the buffering state before it fails.
  */
-@property (nonatomic,assign) int      maxBounceCount;
+@property (nonatomic,assign) int maxBounceCount;
 /**
  * The stream must start within this seconds before it fails.
  */
-@property (nonatomic,assign) int      startupWatchdogPeriod;
+@property (nonatomic,assign) int startupWatchdogPeriod;
+/**
+ * Allow buffering of this many bytes before the cache is full.
+ */
+@property (nonatomic,assign) int maxPrebufferedByteCount;
 /**
  * The HTTP user agent used for stream operations.
  */
@@ -140,7 +145,7 @@ typedef struct {
 
 @end
 
-NSString*             freeStreamerReleaseVersion();
+NSString *freeStreamerReleaseVersion();
 
 /**
  * FSAudioStream is a class for streaming audio files from an URL.
@@ -215,14 +220,6 @@ NSString*             freeStreamerReleaseVersion();
 - (void)seekToPosition:(FSStreamPosition)position;
 
 /**
- * Seeks the stream to a given time value. Requires a non-continuous stream
- * (a stream with a known duration).
- *
- * @param time The stream time value to seek to.
- */
-- (void)seekToTime:(double)time;
-
-/**
  * Sets the audio stream volume from 0.0 to 1.0.
  * Note that the overall volume is still constrained by the volume
  * set by the user! So the actual volume cannot be higher
@@ -233,6 +230,18 @@ NSString*             freeStreamerReleaseVersion();
  * @param volume The audio stream volume.
  */
 - (void)setVolume:(float)volume;
+
+/**
+ * Sets the audio stream playback rate from 0.5 to 2.0.
+ * Value 1.0 means the normal playback rate. Values below
+ * 1.0 means a slower playback rate than usual and above
+ * 1.0 a faster playback rate. Notice that using a faster
+ * playback rate than 1.0 may mean that you have to increase
+ * the buffer sizes for the stream still to play.
+ *
+ * @param playRate The playback rate.
+ */
+- (void)setPlayRate:(float)playRate;
 
 /**
  * Returns the playback status: YES if the stream is playing, NO otherwise.
@@ -273,13 +282,11 @@ NSString*             freeStreamerReleaseVersion();
  * The current playback position cannot be determined for continuous streams.
  */
 @property (nonatomic,readonly) FSStreamPosition currentTimePlayed;
-@property (nonatomic,readonly) double currentTimePlayedDouble;
 /**
  * This property has the duration of the stream, if the stream is non-continuous.
  * Continuous streams do not have a duration.
  */
 @property (nonatomic,readonly) FSStreamPosition duration;
-@property (nonatomic,readonly) double durationDouble;
 /**
  * This property has the current seek byte offset of the stream, if the stream is non-continuous.
  * Continuous streams do not have a seek byte offset.
@@ -289,6 +296,10 @@ NSString*             freeStreamerReleaseVersion();
  * The property is true if the stream is continuous (no known duration).
  */
 @property (nonatomic,readonly) BOOL continuous;
+/**
+ * This property has the number of bytes buffered for this stream.
+ */
+@property (nonatomic,readonly) size_t prebufferedByteCount;
 /**
  * Called upon completion of the stream. Note that for continuous
  * streams this is never called.
@@ -329,4 +340,5 @@ NSString*             freeStreamerReleaseVersion();
  * @param count The number of samples available.
  */
 - (void)audioStream:(FSAudioStream *)audioStream samplesAvailable:(const int16_t *)samples count:(NSUInteger)count;
+
 @end

@@ -25,8 +25,7 @@
 
 @implementation FSAudioController
 
--(id)init
-{
+- (id)init {
     if (self = [super init]) {
         _url = nil;
         _audioStream = nil;
@@ -37,16 +36,14 @@
     return self;
 }
 
-- (id)initWithUrl:(NSURL *)url
-{
+- (id)initWithUrl:(NSURL *)url {
     if (self = [self init]) {
         self.url = url;
     }
     return self;
 }
 
-- (void)dealloc
-{
+- (void)dealloc {
     _audioStream.delegate = nil;
     _audioStream = nil;
     
@@ -61,16 +58,14 @@
  * =======================================
  */
 
-- (FSAudioStream *)audioStream
-{
+- (FSAudioStream *)audioStream {
     if (!_audioStream) {
         _audioStream = [[FSAudioStream alloc] init];
     }
     return _audioStream;
 }
 
-- (FSCheckContentTypeRequest *)checkContentTypeRequest
-{
+- (FSCheckContentTypeRequest *)checkContentTypeRequest {
     if (!_checkContentTypeRequest) {
         __weak FSAudioController *weakSelf = self;
         
@@ -104,8 +99,7 @@
     return _checkContentTypeRequest;
 }
 
-- (FSParsePlaylistRequest *)parsePlaylistRequest
-{
+- (FSParsePlaylistRequest *)parsePlaylistRequest {
     if (!_parsePlaylistRequest) {
         __weak FSAudioController *weakSelf = self;
         
@@ -129,7 +123,7 @@
         };
         _parsePlaylistRequest.onFailure = ^() {
             // Failed to parse the playlist; try playing anyway
-
+            
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
             NSLog(@"FSAudioController: Playlist parsing failed, trying to play anyway, URL: %@", weakSelf.audioStream.url);
 #endif
@@ -141,8 +135,7 @@
     return _parsePlaylistRequest;
 }
 
-- (FSParseRssPodcastFeedRequest *)parseRssPodcastFeedRequest
-{
+- (FSParseRssPodcastFeedRequest *)parseRssPodcastFeedRequest {
     if (!_parseRssPodcastFeedRequest) {
         __weak FSAudioController *weakSelf = self;
         
@@ -178,8 +171,7 @@
     return _parseRssPodcastFeedRequest;
 }
 
-- (BOOL)isPlaying
-{
+- (BOOL)isPlaying {
     return [self.audioStream isPlaying];
 }
 
@@ -189,8 +181,7 @@
  * =======================================
  */
 
-- (void)play
-{
+- (void)play {
     @synchronized (self) {
         if (self.readyToPlay) {
             /*
@@ -208,7 +199,7 @@
              * URL.
              */
             [self.checkContentTypeRequest start];
-        
+            
             NSDictionary *userInfo = @{FSAudioStreamNotificationKey_State: @(kFsAudioStreamRetrievingURL)};
             NSNotification *notification = [NSNotification notificationWithName:FSAudioStreamStateChangeNotification object:nil userInfo:userInfo];
             [[NSNotificationCenter defaultCenter] postNotification:notification];
@@ -216,26 +207,22 @@
     }
 }
 
-- (void)playFromURL:(NSURL*)url
-{
+- (void)playFromURL:(NSURL*)url {
     self.url = url;
-        
+    
     [self play];
 }
 
-- (void)stop
-{
+- (void)stop {
     [self.audioStream stop];
     self.readyToPlay = NO;
 }
 
-- (void)pause
-{
+- (void)pause {
     [self.audioStream pause];
 }
 
-- (void)setVolume:(float)volume
-{
+- (void)setVolume:(float)volume {
     [self.audioStream setVolume:volume];
 }
 
@@ -245,8 +232,7 @@
  * =======================================
  */
 
-- (void)setUrl:(NSURL *)url
-{
+- (void)setUrl:(NSURL *)url {
     @synchronized (self) {
         /*
          * The URL set to nil; stop the audio stream.
@@ -285,14 +271,13 @@
             self.readyToPlay = NO;
             self.playlistItems = [[NSMutableArray alloc] init];
         }
-    
+        
         self.currentPlaylistItemIndex = 0;
         self.audioStream.url = _url;
     }
 }
 
-- (NSURL* )url
-{
+- (NSURL* )url {
     if (!_url) {
         return nil;
     }
@@ -301,13 +286,11 @@
     return copyOfURL;
 }
 
-- (FSAudioStream *)stream
-{
+- (FSAudioStream *)stream {
     return self.audioStream;
 }
 
-- (FSPlaylistItem *)currentPlaylistItem
-{
+- (FSPlaylistItem *)currentPlaylistItem {
     if (self.readyToPlay) {
         if ([self.playlistItems count] > 0) {
             FSPlaylistItem *playlistItem = (self.playlistItems)[self.currentPlaylistItemIndex];

@@ -25,7 +25,7 @@ typedef enum {
  * the url property. Then, define the onCompletion and onFailure handlers.
  * To start the request, use the start method.
  */
-@interface FSParsePlaylistRequest : NSObject <NSURLConnectionDelegate> {
+@interface FSParsePlaylistRequest : NSObject<NSURLConnectionDelegate> {
     NSURLConnection *_connection;
     NSInteger _httpStatus;
     NSMutableData *_receivedData;

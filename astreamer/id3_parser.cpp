@@ -73,12 +73,10 @@ namespace astreamer {
     m_usesUnsynchronisation(false),
     m_usesExtendedHeader(false),
     m_title(NULL),
-    m_performer(NULL)
-    {
+    m_performer(NULL) {
     }
     
-    ID3_Parser_Private::~ID3_Parser_Private()
-    {
+    ID3_Parser_Private::~ID3_Parser_Private() {
         if (m_performer) {
             CFRelease(m_performer), m_performer = NULL;
         }
@@ -87,8 +85,7 @@ namespace astreamer {
         }
     }
     
-    bool ID3_Parser_Private::wantData()
-    {
+    bool ID3_Parser_Private::wantData() {
         if (m_state == ID3_Parser_State_Tag_Parsed) {
             return false;
         }
@@ -99,8 +96,7 @@ namespace astreamer {
         return true;
     }
     
-    void ID3_Parser_Private::feedData(UInt8 *data, UInt32 numBytes)
-    {
+    void ID3_Parser_Private::feedData(UInt8 *data, UInt32 numBytes) {
         if (!wantData()) {
             return;
         }
@@ -294,13 +290,11 @@ namespace astreamer {
         }
     }
     
-    void ID3_Parser_Private::setState(astreamer::ID3_Parser_State state)
-    {
+    void ID3_Parser_Private::setState(astreamer::ID3_Parser_State state) {
         m_state = state;
     }
     
-    void ID3_Parser_Private::reset()
-    {
+    void ID3_Parser_Private::reset() {
         m_state = ID3_Parser_State_Initial;
         m_bytesReceived = 0;
         m_tagSize = 0;
@@ -318,8 +312,8 @@ namespace astreamer {
         m_tagData.clear();
     }
     
-    CFStringRef ID3_Parser_Private::parseContent(UInt32 framesize, UInt32 pos, CFStringEncoding encoding, bool byteOrderMark)
-    {
+    CFStringRef ID3_Parser_Private::parseContent(UInt32 framesize,
+                                                 UInt32 pos, CFStringEncoding encoding, bool byteOrderMark) {
         CFStringRef content = CFStringCreateWithBytes(kCFAllocatorDefault,
                                                       &m_tagData[pos],
                                                       framesize - 1,
@@ -337,28 +331,23 @@ namespace astreamer {
     
     ID3_Parser::ID3_Parser() :
     m_delegate(0),
-    m_private(new ID3_Parser_Private())
-    {
+    m_private(new ID3_Parser_Private()) {
         m_private->m_parser = this;
     }
     
-    ID3_Parser::~ID3_Parser()
-    {
+    ID3_Parser::~ID3_Parser() {
         delete m_private, m_private = 0;
     }
     
-    void ID3_Parser::reset()
-    {
+    void ID3_Parser::reset() {
         m_private->reset();
     }
     
-    bool ID3_Parser::wantData()
-    {
+    bool ID3_Parser::wantData() {
         return m_private->wantData();
     }
     
-    void ID3_Parser::feedData(UInt8 *data, UInt32 numBytes)
-    {
+    void ID3_Parser::feedData(UInt8 *data, UInt32 numBytes) {
         m_private->feedData(data, numBytes);
     }
     

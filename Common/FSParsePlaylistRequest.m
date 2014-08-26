@@ -10,8 +10,8 @@
 #import "FSPlaylistItem.h"
 
 @interface FSParsePlaylistRequest ()
-- (void)parsePlaylistFromData:(NSData *)data prefix:(NSString *)prefixString;
-- (void)parsePlaylistM3U:(NSString *)playlist prefix:(NSString *)prefixString;
+- (void)parsePlaylistFromData:(NSData *)data;
+- (void)parsePlaylistM3U:(NSString *)playlist;
 - (void)parsePlaylistPLS:(NSString *)playlist;
 
 @property (readonly) FSPlaylistFormat format;
@@ -20,16 +20,14 @@
 
 @implementation FSParsePlaylistRequest
 
-- (id)init
-{
+- (id)init {
     self = [super init];
     if (self) {
     }
     return self;
 }
 
-- (void)start
-{
+- (void)start {
     if (_connection) {
         return;
     }
@@ -51,8 +49,7 @@
     }
 }
 
-- (void)cancel
-{
+- (void)cancel {
     if (!_connection) {
         return;
     }
@@ -68,13 +65,11 @@
  * =======================================
  */
 
-- (NSMutableArray *)playlistItems
-{
+- (NSMutableArray *)playlistItems {
     return [_playlistItems copy];
 }
 
-- (FSPlaylistFormat)format
-{
+- (FSPlaylistFormat)format {
     return _format;
 }
 
@@ -84,12 +79,11 @@
  * =======================================
  */
 
-- (void)parsePlaylistFromData:(NSData *)data prefix:(NSString *)prefixString
-{
+- (void)parsePlaylistFromData:(NSData *)data {
     NSString *playlistData = [[NSString alloc] initWithData:data encoding:NSASCIIStringEncoding];
     
     if (_format == kFSPlaylistFormatM3U) {
-        [self parsePlaylistM3U:playlistData prefix:prefixString];
+        [self parsePlaylistM3U:playlistData];
         
         if ([_playlistItems count] == 0) {
             // If we failed to grab any playlist items, still try
@@ -106,7 +100,7 @@
             // to parse it in another format; perhaps the server
             // mistakingly identified the playlist format
             
-            [self parsePlaylistM3U:playlistData prefix:prefixString];
+            [self parsePlaylistM3U:playlistData];
         }
     }
     
@@ -118,8 +112,7 @@
     }
 }
 
-- (void)parsePlaylistM3U:(NSString *)playlist prefix:(NSString *)prefixString
-{
+- (void)parsePlaylistM3U:(NSString *)playlist {
     [_playlistItems removeAllObjects];
     
     for (NSString *line in [playlist componentsSeparatedByString:@"\n"]) {
@@ -131,21 +124,13 @@
             [line hasPrefix:@"https://"]) {
             FSPlaylistItem *item = [[FSPlaylistItem alloc] init];
             item.url = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            
             [_playlistItems addObject:item];
-        } else {
-            if (line && line.length > 1) {
-                NSString *urlString = [prefixString stringByAppendingString:line];
-                NSLog(@"%@", urlString);
-                FSPlaylistItem *item = [[FSPlaylistItem alloc] init];
-                item.url = [urlString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-                [_playlistItems addObject:item];
-            }
         }
     }
 }
 
-- (void)parsePlaylistPLS:(NSString *)playlist
-{
+- (void)parsePlaylistPLS:(NSString *)playlist {
     [_playlistItems removeAllObjects];
     
     NSMutableDictionary *props = [[NSMutableDictionary alloc] init];
@@ -218,8 +203,7 @@
  * =======================================
  */
 
-- (void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response
-{
+- (void)connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response {
     NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
     _httpStatus = [httpResponse statusCode];
     
@@ -258,13 +242,11 @@
     [_receivedData setLength:0];
 }
 
-- (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data
-{
+- (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data {
     [_receivedData appendData:data];
 }
 
-- (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error
-{
+- (void)connection:(NSURLConnection *)connection didFailWithError:(NSError *)error {
     @synchronized (self) {
         _connection = nil;
         _receivedData = nil;
@@ -277,8 +259,7 @@
     self.onFailure();
 }
 
-- (void)connectionDidFinishLoading:(NSURLConnection *)connection
-{
+- (void)connectionDidFinishLoading:(NSURLConnection *)connection {
     assert(_connection == connection);
     
     @synchronized (self) {
@@ -294,11 +275,7 @@
         return;
     }
     
-    NSLog(@"%@ %@", _url, [_url URLByDeletingLastPathComponent]);
-    NSURL *prefixURL = [_url URLByDeletingLastPathComponent];
-    [prefixURL absoluteString];
-    NSLog(@"%@ %@", _url, [prefixURL absoluteString]);
-    [self parsePlaylistFromData:_receivedData prefix:[prefixURL absoluteString]];
+    [self parsePlaylistFromData:_receivedData];
     
     self.onCompletion();
 }

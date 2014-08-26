@@ -26,8 +26,7 @@
 
 @implementation FSStreamConfiguration
 
-- (id)init
-{
+- (id)init {
     self = [super init];
     if (self) {
         NSMutableString *systemVersion = [[NSMutableString alloc] init];
@@ -39,16 +38,17 @@
         [systemVersion appendString:@"OS X"];
 #endif
         
-        self.bufferCount = 8;
-        self.bufferSize = 32768;
+        self.bufferCount    = 8;
+        self.bufferSize     = 32768;
         self.maxPacketDescs = 512;
         self.decodeQueueSize = 32;
         self.httpConnectionBufferSize = 1024;
         self.outputSampleRate = 44100;
         self.outputNumChannels = 2;
-        self.bounceInterval = 10;
-        self.maxBounceCount = 4;   // Max number of bufferings in bounceInterval seconds
+        self.bounceInterval    = 10;
+        self.maxBounceCount    = 4;   // Max number of bufferings in bounceInterval seconds
         self.startupWatchdogPeriod = 30; // If the stream doesn't start to play in this seconds, the watchdog will fail it
+        self.maxPrebufferedByteCount = 1000000; // 1 MB
         self.userAgent = [NSString stringWithFormat:@"FreeStreamer/%@ (%@)", freeStreamerReleaseVersion(), systemVersion];
         
 #if (__IPHONE_OS_VERSION_MIN_REQUIRED >= 60000)
@@ -62,10 +62,10 @@
             self.outputNumChannels = channels;
         }
 #endif
-            
+        
 #if (__IPHONE_OS_VERSION_MIN_REQUIRED >= 40000)
         /* iOS */
-            
+        
 #ifdef __LP64__
         /* Running on iPhone 5s or later,
          * so the default configuration is OK
@@ -78,15 +78,15 @@
          * https://github.com/muhku/FreeStreamer/issues/41
          */
         int scale = 2;
-            
+        
         self.bufferCount    *= scale;
         self.bufferSize     *= scale;
         self.maxPacketDescs *= scale;
 #endif
 #else
-            /* OS X */
-            
-            // Default configuration is OK
+        /* OS X */
+        
+        // Default configuration is OK
 #endif
     }
     
@@ -95,8 +95,7 @@
 
 @end
 
-NSString *freeStreamerReleaseVersion()
-{
+NSString *freeStreamerReleaseVersion() {
     NSString *version = [NSString stringWithFormat:@"%i.%i.%i",
                          FREESTREAMER_VERSION_MAJOR,
                          FREESTREAMER_VERSION_MINOR,
@@ -114,8 +113,7 @@ NSString* const FSAudioStreamNotificationKey_Error = @"error";
 NSString* const FSAudioStreamMetaDataNotification = @"FSAudioStreamMetaDataNotification";
 NSString* const FSAudioStreamNotificationKey_MetaData = @"metadata";
 
-class AudioStreamStateObserver : public astreamer::Audio_Stream_Delegate
-{
+class AudioStreamStateObserver : public astreamer::Audio_Stream_Delegate {
 private:
     bool m_eofReached;
     
@@ -142,6 +140,7 @@ public:
 	AudioStreamStateObserver *_observer;
     NSString *_defaultContentType;
     Reachability *_reachability;
+    FSSeekByteOffset _lastSeekByteOffset;
 #if (__IPHONE_OS_VERSION_MIN_REQUIRED >= 40000)
     UIBackgroundTaskIdentifier _backgroundTask;
 #endif
@@ -156,7 +155,8 @@ public:
 @property (nonatomic,assign) BOOL wasInterrupted;
 @property (nonatomic,assign) BOOL wasDisconnected;
 @property (nonatomic,assign) BOOL wasContinuousStream;
-@property (nonatomic,assign) FSSeekByteOffset lastSeekByteOffset;
+@property (readonly) size_t prebufferedByteCount;
+@property (readonly) FSSeekByteOffset currentSeekByteOffset;
 @property (readonly) FSStreamConfiguration *configuration;
 @property (readonly) NSString *formatDescription;
 @property (copy) void (^onCompletion)();
@@ -177,28 +177,26 @@ public:
 - (BOOL)isPlaying;
 - (void)pause;
 - (void)seekToTime:(unsigned)newSeekTime;
-- (void)seekToTimeDouble:(double)newSeekTime;
 - (void)setVolume:(float)volume;
+- (void)setPlayRate:(float)playRate;
 - (unsigned)timePlayedInSeconds;
-- (double)timePlayedInSecondsDouble;
 - (unsigned)durationInSeconds;
-- (double)durationInSecondsDouble;
 - (astreamer::HTTP_Stream_Position)streamPositionForTime:(unsigned)newSeekTime;
+
 @end
 
 @implementation FSAudioStreamPrivate
 
--(id)init
-{
+- (id)init {
     if (self = [super init]) {
         _url = nil;
         
         _observer = new AudioStreamStateObserver();
         _observer->priv = self;
-       
+        
         _audioStream = new astreamer::Audio_Stream();
         _observer->source = _audioStream;
-
+        
         _audioStream->m_delegate = _observer;
         
         _reachability = [Reachability reachabilityForInternetConnection];
@@ -211,7 +209,7 @@ public:
                                                  selector:@selector(reachabilityChanged:)
                                                      name:kReachabilityChangedNotification
                                                    object:nil];
-
+        
 #if (__IPHONE_OS_VERSION_MIN_REQUIRED >= 40000)
         [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback error:nil];
 #endif
@@ -226,8 +224,7 @@ public:
     return self;
 }
 
-- (void)dealloc
-{
+- (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     
     [self stop];
@@ -238,13 +235,11 @@ public:
     delete _observer, _observer = nil;
 }
 
-- (AudioStreamStateObserver *)streamStateObserver
-{
+- (AudioStreamStateObserver *)streamStateObserver {
     return _observer;
 }
 
-- (void)setUrl:(NSURL *)url
-{
+- (void)setUrl:(NSURL *)url {
     if ([self isPlaying]) {
         [self stop];
     }
@@ -264,8 +259,7 @@ public:
     }
 }
 
-- (NSURL*)url
-{
+- (NSURL*)url {
     if (!_url) {
         return nil;
     }
@@ -274,8 +268,7 @@ public:
     return copyOfURL;
 }
 
-- (void)setStrictContentTypeChecking:(BOOL)strictContentTypeChecking
-{
+- (void)setStrictContentTypeChecking:(BOOL)strictContentTypeChecking {
     if (_strictContentTypeChecking == strictContentTypeChecking) {
         // No change
         return;
@@ -284,19 +277,16 @@ public:
     _audioStream->setStrictContentTypeChecking(strictContentTypeChecking);
 }
 
-- (BOOL)strictContentTypeChecking
-{
+- (BOOL)strictContentTypeChecking {
     return _strictContentTypeChecking;
 }
 
-- (void)playFromURL:(NSURL*)url
-{
-   [self setUrl:url];
-   [self play];
+- (void)playFromURL:(NSURL*)url {
+    [self setUrl:url];
+    [self play];
 }
 
-- (void)playFromOffset:(FSSeekByteOffset)offset
-{
+- (void)playFromOffset:(FSSeekByteOffset)offset {
     astreamer::HTTP_Stream_Position position;
     position.start = offset.start;
     position.end   = offset.end;
@@ -304,13 +294,12 @@ public:
     _audioStream->open(&position);
     
     _audioStream->setSeekPosition(offset.position);
-    _audioStream->setContentLength((size_t)offset.end);
+    _audioStream->setContentLength(offset.end);
     
     [_reachability startNotifier];
 }
 
-- (void)setDefaultContentType:(NSString *)defaultContentType
-{
+- (void)setDefaultContentType:(NSString *)defaultContentType {
     if (defaultContentType) {
         _defaultContentType = [defaultContentType copy];
         _audioStream->setDefaultContentType((__bridge CFStringRef)_defaultContentType);
@@ -319,8 +308,7 @@ public:
     }
 }
 
-- (NSString*)defaultContentType
-{
+- (NSString*)defaultContentType {
     if (!_defaultContentType) {
         return nil;
     }
@@ -329,8 +317,7 @@ public:
     return copyOfDefaultContentType;
 }
 
-- (NSString*)contentType
-{
+- (NSString*)contentType {
     CFStringRef c = _audioStream->contentType();
     if (c) {
         return CFBridgingRelease(CFStringCreateCopy(kCFAllocatorDefault, c));
@@ -338,8 +325,7 @@ public:
     return nil;
 }
 
-- (NSString*)suggestedFileExtension
-{
+- (NSString*)suggestedFileExtension {
     NSString *contentType = [self contentType];
     NSString *suggestedFileExtension = nil;
     
@@ -357,16 +343,14 @@ public:
         suggestedFileExtension = @"mp4";
     } else if ([contentType isEqualToString:@"audio/x-caf"]) {
         suggestedFileExtension = @"caf";
-    }
-    else if ([contentType isEqualToString:@"audio/aac"] ||
+    } else if ([contentType isEqualToString:@"audio/aac"] ||
              [contentType isEqualToString:@"audio/aacp"]) {
         suggestedFileExtension = @"aac";
     }
     return suggestedFileExtension;
 }
 
-- (NSURL*)outputFile
-{
+- (NSURL*)outputFile {
     CFURLRef url = _audioStream->outputFile();
     if (url) {
         NSURL *u = (__bridge NSURL*)url;
@@ -375,8 +359,7 @@ public:
     return nil;
 }
 
-- (void)setOutputFile:(NSURL *)outputFile
-{
+- (void)setOutputFile:(NSURL *)outputFile {
     if (!outputFile) {
         _audioStream->setOutputFile(NULL);
         return;
@@ -385,8 +368,32 @@ public:
     _audioStream->setOutputFile((__bridge CFURLRef)copyOfURL);
 }
 
-- (FSStreamConfiguration *)configuration
-{
+- (size_t)prebufferedByteCount {
+    return _audioStream->cachedDataSize();
+}
+
+- (FSSeekByteOffset)currentSeekByteOffset {
+    FSSeekByteOffset offset;
+    offset.start = 0;
+    offset.end = 0;
+    offset.position = 0;
+    
+    // If continuous
+    if ((0 == [self durationInSeconds])) {
+        return offset;
+    }
+    
+    offset.position = [self timePlayedInSeconds];
+    
+    astreamer::HTTP_Stream_Position httpStreamPos = [self streamPositionForTime:offset.position];
+    
+    offset.start = httpStreamPos.start;
+    offset.end   = httpStreamPos.end;
+    
+    return offset;
+}
+
+- (FSStreamConfiguration *)configuration {
     FSStreamConfiguration *config = [[FSStreamConfiguration alloc] init];
     
     astreamer::Stream_Configuration *c = astreamer::Stream_Configuration::configuration();
@@ -401,32 +408,31 @@ public:
     config.bounceInterval           = c->bounceInterval;
     config.maxBounceCount           = c->maxBounceCount;
     config.startupWatchdogPeriod    = c->startupWatchdogPeriod;
+    config.maxPrebufferedByteCount  = c->maxPrebufferedByteCount;
     
     if (c->userAgent) {
         // Let the Objective-C side handle the memory for the copy of the original user-agent
         config.userAgent = (__bridge_transfer NSString *)CFStringCreateCopy(kCFAllocatorDefault, c->userAgent);
     }
-
+    
     return config;
 }
 
-- (NSString *)formatDescription
-{
+- (NSString *)formatDescription {
     return CFBridgingRelease(_audioStream->sourceFormatDescription());
 }
 
-- (void)reachabilityChanged:(NSNotification *)note
-{
+- (void)reachabilityChanged:(NSNotification *)note {
     Reachability *reach = [note object];
     NetworkStatus netStatus = [reach currentReachabilityStatus];
     BOOL internetConnectionAvailable = (netStatus == ReachableViaWiFi || netStatus == ReachableViaWWAN);
     
     if ([self isPlaying] && !internetConnectionAvailable) {
         self.wasDisconnected = YES;
-        self.lastSeekByteOffset = self.stream.currentSeekByteOffset;
+        _lastSeekByteOffset = [self currentSeekByteOffset];
         
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-        NSLog(@"FSAudioStream: Error: Internet connection disconnected while playing a stream. %d", self.lastSeekByteOffset.position);
+        NSLog(@"FSAudioStream: Error: Internet connection disconnected while playing a stream.");
 #endif
     }
     
@@ -451,11 +457,10 @@ public:
 }
 
 - (void)continuePlay {
-    [self playFromOffset:self.lastSeekByteOffset];
+    [self playFromOffset:_lastSeekByteOffset];
 }
 
-- (void)interruptionOccurred:(NSNotification *)notification
-{
+- (void)interruptionOccurred:(NSNotification *)notification {
 #if (__IPHONE_OS_VERSION_MIN_REQUIRED >= 60000)
     NSNumber *interruptionType = [[notification userInfo] valueForKey:AVAudioSessionInterruptionTypeKey];
     if ([interruptionType intValue] == AVAudioSessionInterruptionTypeBegan) {
@@ -471,9 +476,10 @@ public:
                 [self stop];
             } else {
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-                NSLog(@"FSAudioStream: Interruption began. Non-continuous stream. Pausing the stream.");
+                NSLog(@"FSAudioStream: Interruption began. Non-continuous stream. Stopping the stream and saving the offset.");
 #endif
-                [self pause];
+                _lastSeekByteOffset = [self currentSeekByteOffset];
+                [self stop];
             }
         }
     } else if ([interruptionType intValue] == AVAudioSessionInterruptionTypeEnded) {
@@ -492,27 +498,25 @@ public:
                 [self play];
             } else {
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-                NSLog(@"FSAudioStream: Interruption ended. Continuous stream. Unpausing the stream.");
+                NSLog(@"FSAudioStream: Interruption ended. Continuous stream. Playing from the offset");
 #endif
                 /*
                  * Resume playing.
                  */
-               [self pause];
+                [self playFromOffset:_lastSeekByteOffset];
             }
         }
     }
 #endif
 }
 
-- (void)play
-{
+- (void)play {
     _audioStream->open();
     
     [_reachability startNotifier];
 }
 
-- (void)stop
-{
+- (void)stop {
     _audioStream->close();
     
 #if (__IPHONE_OS_VERSION_MIN_REQUIRED >= 40000)
@@ -525,55 +529,40 @@ public:
     [_reachability stopNotifier];
 }
 
-- (BOOL)isPlaying
-{
+- (BOOL)isPlaying {
     return (_audioStream->state() == astreamer::Audio_Stream::PLAYING);
 }
 
-- (void)pause
-{
+- (void)pause {
     _audioStream->pause();
 }
 
-- (void)seekToTime:(unsigned)newSeekTime
-{
+- (void)seekToTime:(unsigned)newSeekTime {
     _audioStream->seekToTime(newSeekTime);
 }
 
-- (void)seekToTimeDouble:(double)newSeekTime
-{
-    _audioStream->seekToTimeDouble(newSeekTime);
-}
-
-- (void)setVolume:(float)volume
-{
+- (void)setVolume:(float)volume {
     _audioStream->setVolume(volume);
 }
 
-- (unsigned)timePlayedInSeconds
-{
-    return _audioStream->timePlayedInSeconds();
+- (void)setPlayRate:(float)playRate {
+    _audioStream->setPlayRate(playRate);
 }
 
-- (double)timePlayedInSecondsDouble {
-    return _audioStream->timePlayedInSecondsDouble();
+- (unsigned)timePlayedInSeconds {
+    return _audioStream->timePlayedInSeconds();
 }
 
 - (unsigned)durationInSeconds {
     return _audioStream->durationInSeconds();
 }
 
-- (double)durationInSecondsDouble {
-    return _audioStream->durationInSecondsDouble();
-}
-
-- (astreamer::HTTP_Stream_Position)streamPositionForTime:(unsigned)newSeekTime
-{
+- (astreamer::HTTP_Stream_Position)streamPositionForTime:(unsigned)newSeekTime {
     return _audioStream->streamPositionForTime(newSeekTime);
 }
 
 - (NSString *)description {
-    return [NSString stringWithFormat:@"[FreeStreamer %@] URL: %@\nbufferCount: %i\nbufferSize: %i\nmaxPacketDescs: %i\ndecodeQueueSize: %i\nhttpConnectionBufferSize: %i\noutputSampleRate: %f\noutputNumChannels: %ld\nbounceInterval: %i\nmaxBounceCount: %i\nstartupWatchdogPeriod: %i\nformat: %@\nuserAgent: %@",
+    return [NSString stringWithFormat:@"[FreeStreamer %@] URL: %@\nbufferCount: %i\nbufferSize: %i\nmaxPacketDescs: %i\ndecodeQueueSize: %i\nhttpConnectionBufferSize: %i\noutputSampleRate: %f\noutputNumChannels: %ld\nbounceInterval: %i\nmaxBounceCount: %i\nstartupWatchdogPeriod: %i\nmaxPrebufferedByteCount: %i\nformat: %@\nuserAgent: %@",
             freeStreamerReleaseVersion(),
             self.url,
             self.configuration.bufferCount,
@@ -586,6 +575,7 @@ public:
             self.configuration.bounceInterval,
             self.configuration.maxBounceCount,
             self.configuration.startupWatchdogPeriod,
+            self.configuration.maxPrebufferedByteCount,
             self.formatDescription,
             self.configuration.userAgent];
 }
@@ -601,8 +591,7 @@ public:
 
 @implementation FSAudioStream
 
--(id)init
-{
+- (id)init {
     FSStreamConfiguration *defaultConfiguration = [[FSStreamConfiguration alloc] init];
     
     if (self = [self initWithConfiguration:defaultConfiguration]) {
@@ -610,16 +599,14 @@ public:
     return self;
 }
 
-- (id)initWithUrl:(NSURL *)url
-{
+- (id)initWithUrl:(NSURL *)url {
     if (self = [self init]) {
         _private.url = url;
     }
     return self;
 }
 
-- (id)initWithConfiguration:(FSStreamConfiguration *)configuration
-{
+- (id)initWithConfiguration:(FSStreamConfiguration *)configuration {
     if (self = [super init]) {
         astreamer::Stream_Configuration *c = astreamer::Stream_Configuration::configuration();
         
@@ -633,6 +620,7 @@ public:
         c->maxBounceCount           = configuration.maxBounceCount;
         c->bounceInterval           = configuration.bounceInterval;
         c->startupWatchdogPeriod    = configuration.startupWatchdogPeriod;
+        c->maxPrebufferedByteCount  = configuration.maxPrebufferedByteCount;
         
         if (c->userAgent) {
             CFRelease(c->userAgent);
@@ -645,8 +633,7 @@ public:
     return self;
 }
 
-- (void)dealloc
-{
+- (void)dealloc {
     AudioStreamStateObserver *observer = [_private streamStateObserver];
     
     // Break the cyclic loop so that dealloc() may be called
@@ -658,104 +645,85 @@ public:
     _private = nil;
 }
 
-- (void)setUrl:(NSURL *)url
-{
+- (void)setUrl:(NSURL *)url {
     [_private setUrl:url];
 }
 
-- (NSURL*)url
-{
+- (NSURL*)url {
     return [_private url];
 }
 
-- (void)setStrictContentTypeChecking:(BOOL)strictContentTypeChecking
-{
+- (void)setStrictContentTypeChecking:(BOOL)strictContentTypeChecking {
     [_private setStrictContentTypeChecking:strictContentTypeChecking];
 }
 
-- (BOOL)strictContentTypeChecking
-{
+- (BOOL)strictContentTypeChecking {
     return [_private strictContentTypeChecking];
 }
 
-- (NSURL*)outputFile
-{
+- (NSURL*)outputFile {
     return [_private outputFile];
 }
 
-- (void)setOutputFile:(NSURL *)outputFile
-{
+- (void)setOutputFile:(NSURL *)outputFile {
     [_private setOutputFile:outputFile];
 }
 
-- (void)setDefaultContentType:(NSString *)defaultContentType
-{
+- (void)setDefaultContentType:(NSString *)defaultContentType {
     [_private setDefaultContentType:defaultContentType];
 }
 
-- (NSString*)defaultContentType
-{
+- (NSString*)defaultContentType {
     return [_private defaultContentType];
 }
 
-- (NSString*)contentType
-{
+- (NSString*)contentType {
     return [_private contentType];
 }
 
-- (NSString*)suggestedFileExtension
-{
+- (NSString*)suggestedFileExtension {
     return [_private suggestedFileExtension];
 }
 
-- (void)play
-{
-    [_private play];   
+- (void)play {
+    [_private play];
 }
 
-- (void)playFromURL:(NSURL*)url
-{
+- (void)playFromURL:(NSURL*)url {
     [_private playFromURL:url];
 }
 
-- (void)playFromOffset:(FSSeekByteOffset)offset
-{
+- (void)playFromOffset:(FSSeekByteOffset)offset {
     [_private playFromOffset:offset];
 }
 
-- (void)stop
-{
+- (void)stop {
     [_private stop];
 }
 
-- (void)pause
-{
+- (void)pause {
     [_private pause];
 }
 
-- (void)seekToPosition:(FSStreamPosition)position
-{
+- (void)seekToPosition:(FSStreamPosition)position {
     unsigned seekTime = position.minute * 60 + position.second;
     
     [_private seekToTime:seekTime];
 }
 
-- (void)seekToTime:(double)time {
-    [_private seekToTimeDouble:time];
-}
-
-- (void)setVolume:(float)volume
-{
+- (void)setVolume:(float)volume {
     [_private setVolume:volume];
 }
 
-- (BOOL)isPlaying
-{
+- (void)setPlayRate:(float)playRate {
+    [_private setPlayRate:playRate];
+}
+
+- (BOOL)isPlaying {
     return [_private isPlaying];
 }
 
-- (FSStreamPosition)currentTimePlayed
-{
+- (FSStreamPosition)currentTimePlayed {
     unsigned u = [_private timePlayedInSeconds];
     
     unsigned s,m;
@@ -767,13 +735,7 @@ public:
     return pos;
 }
 
-- (double)currentTimePlayedDouble {
-    double c = [_private timePlayedInSecondsDouble];
-    return c;
-}
-
-- (FSStreamPosition)duration
-{
+- (FSStreamPosition)duration {
     unsigned u = [_private durationInSeconds];
     
     unsigned s,m;
@@ -785,80 +747,52 @@ public:
     return pos;
 }
 
-- (double)durationDouble {
-    double d = [_private durationInSecondsDouble];
-    return d;
+- (FSSeekByteOffset)currentSeekByteOffset {
+    return _private.currentSeekByteOffset;
 }
 
-- (FSSeekByteOffset)currentSeekByteOffset
-{
-    FSSeekByteOffset offset;
-    offset.start    = 0;
-    offset.end      = 0;
-    offset.position = 0;
-    
-    if (self.continuous) {
-        return offset;
-    }
-    
-    offset.position = [_private timePlayedInSeconds];
-    
-    astreamer::HTTP_Stream_Position httpStreamPos = [_private streamPositionForTime:offset.position];
-    
-    offset.start = httpStreamPos.start;
-    offset.end   = httpStreamPos.end;
-    
-    return offset;
-}
-
-- (BOOL)continuous
-{
+- (BOOL)continuous {
     FSStreamPosition duration = self.duration;
     return (duration.minute == 0 && duration.second == 0);
 }
 
-- (void (^)())onCompletion
-{
+- (size_t)prebufferedByteCount {
+    return _private.prebufferedByteCount;
+}
+
+- (void (^)())onCompletion {
     return _private.onCompletion;
 }
 
-- (void)setOnCompletion:(void (^)())onCompletion
-{
+- (void)setOnCompletion:(void (^)())onCompletion {
     _private.onCompletion = onCompletion;
 }
 
-- (void (^)())onFailure
-{
+- (void (^)())onFailure {
     return _private.onFailure;
 }
 
-- (void)setOnFailure:(void (^)())onFailure
-{
+- (void)setOnFailure:(void (^)())onFailure {
     _private.onFailure = onFailure;
 }
 
-- (FSStreamConfiguration *)configuration
-{
+- (FSStreamConfiguration *)configuration {
     return _private.configuration;
 }
 
-- (FSAudioStreamError)lastError
-{
+- (FSAudioStreamError)lastError {
     return _private.lastError;
 }
 
-- (void)setDelegate:(id<FSPCMAudioStreamDelegate>)delegate
-{
+- (void)setDelegate:(id<FSPCMAudioStreamDelegate>)delegate {
     _private.delegate = delegate;
 }
 
-- (id<FSPCMAudioStreamDelegate>)delegate
-{
+- (id<FSPCMAudioStreamDelegate>)delegate {
     return _private.delegate;
 }
 
--(NSString *)description
-{
+- (NSString *)description {
     return [_private description];
 }
 
@@ -869,9 +803,8 @@ public:
  * AudioStreamStateObserver: listen to the state from the audio stream.
  * ===============================================================
  */
-    
-void AudioStreamStateObserver::audioStreamErrorOccurred(int errorCode)
-{
+
+void AudioStreamStateObserver::audioStreamErrorOccurred(int errorCode) {
     switch (errorCode) {
         case kFsAudioStreamErrorOpen:
             priv.lastError = kFsAudioStreamErrorOpen;
@@ -891,7 +824,7 @@ void AudioStreamStateObserver::audioStreamErrorOccurred(int errorCode)
             break;
         case kFsAudioStreamErrorNetwork:
             priv.lastError = kFsAudioStreamErrorNetwork;
-        
+            
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
             NSLog(@"FSAudioStream: Network error: %@", priv);
 #endif
@@ -899,7 +832,7 @@ void AudioStreamStateObserver::audioStreamErrorOccurred(int errorCode)
             break;
         case kFsAudioStreamErrorUnsupportedFormat:
             priv.lastError = kFsAudioStreamErrorUnsupportedFormat;
-    
+            
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
             NSLog(@"FSAudioStream: Unsupported format error: %@", priv);
 #endif
@@ -920,14 +853,13 @@ void AudioStreamStateObserver::audioStreamErrorOccurred(int errorCode)
     }
     
     NSDictionary *userInfo = @{FSAudioStreamNotificationKey_Error: @(errorCode),
-                              FSAudioStreamNotificationKey_Stream: [NSValue valueWithPointer:source]};
+                               FSAudioStreamNotificationKey_Stream: [NSValue valueWithPointer:source]};
     NSNotification *notification = [NSNotification notificationWithName:FSAudioStreamErrorNotification object:nil userInfo:userInfo];
     
     [[NSNotificationCenter defaultCenter] postNotification:notification];
 }
-    
-void AudioStreamStateObserver::audioStreamStateChanged(astreamer::Audio_Stream::State state)
-{
+
+void AudioStreamStateObserver::audioStreamStateChanged(astreamer::Audio_Stream::State state) {
     NSNumber *fsAudioState;
     
     switch (state) {
@@ -953,6 +885,11 @@ void AudioStreamStateObserver::audioStreamStateChanged(astreamer::Audio_Stream::
 #if (__IPHONE_OS_VERSION_MIN_REQUIRED >= 40000)
             [[AVAudioSession sharedInstance] setActive:YES error:nil];
 #endif
+            break;
+        case astreamer::Audio_Stream::PAUSED:
+            priv.lastError = kFsAudioStreamErrorNone;
+            m_eofReached = false;
+            fsAudioState = [NSNumber numberWithInt:kFsAudioStreamPaused];
             break;
         case astreamer::Audio_Stream::SEEKING:
             priv.lastError = kFsAudioStreamErrorNone;
@@ -982,14 +919,13 @@ void AudioStreamStateObserver::audioStreamStateChanged(astreamer::Audio_Stream::
     }
     
     NSDictionary *userInfo = @{FSAudioStreamNotificationKey_State: fsAudioState,
-                              FSAudioStreamNotificationKey_Stream: [NSValue valueWithPointer:source]};
+                               FSAudioStreamNotificationKey_Stream: [NSValue valueWithPointer:source]};
     NSNotification *notification = [NSNotification notificationWithName:FSAudioStreamStateChangeNotification object:nil userInfo:userInfo];
     
     [[NSNotificationCenter defaultCenter] postNotification:notification];
 }
-    
-void AudioStreamStateObserver::audioStreamMetaDataAvailable(std::map<CFStringRef,CFStringRef> metaData)
-{
+
+void AudioStreamStateObserver::audioStreamMetaDataAvailable(std::map<CFStringRef,CFStringRef> metaData) {
     NSMutableDictionary *metaDataDictionary = [[NSMutableDictionary alloc] init];
     
     for (std::map<CFStringRef,CFStringRef>::iterator iter = metaData.begin(); iter != metaData.end(); ++iter) {
@@ -1016,14 +952,13 @@ void AudioStreamStateObserver::audioStreamMetaDataAvailable(std::map<CFStringRef
 #endif
     
     NSDictionary *userInfo = @{FSAudioStreamNotificationKey_MetaData: metaDataDictionary,
-                              FSAudioStreamNotificationKey_Stream: [NSValue valueWithPointer:source]};
+                               FSAudioStreamNotificationKey_Stream: [NSValue valueWithPointer:source]};
     NSNotification *notification = [NSNotification notificationWithName:FSAudioStreamMetaDataNotification object:nil userInfo:userInfo];
     
     [[NSNotificationCenter defaultCenter] postNotification:notification];
 }
 
-void AudioStreamStateObserver::samplesAvailable(AudioBufferList samples, AudioStreamPacketDescription description)
-{
+void AudioStreamStateObserver::samplesAvailable(AudioBufferList samples, AudioStreamPacketDescription description) {
     if ([priv.delegate respondsToSelector:@selector(audioStream:samplesAvailable:count:)]) {
         int16_t *buffer = (int16_t *)samples.mBuffers[0].mData;
         NSUInteger count = description.mDataByteSize / sizeof(int16_t);

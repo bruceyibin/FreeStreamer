@@ -49,13 +49,12 @@ typedef enum {
  * the url property. Then, define the onCompletion and onFailure handlers.
  * To start the request, use the start method.
  */
-@interface FSCheckContentTypeRequest : NSObject <NSURLConnectionDelegate> {
+@interface FSCheckContentTypeRequest : NSObject<NSURLConnectionDelegate> {
     NSURLConnection *_connection;
     FSFileFormat _format;
     NSString *_contentType;
     BOOL _playlist;
     BOOL _xml;
-    BOOL finished;
 }
 
 /**
