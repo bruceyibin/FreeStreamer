@@ -57,12 +57,12 @@ namespace astreamer {
         void open(HTTP_Stream_Position *position);
         void close();
         void pause();
-        
-        unsigned timePlayedInSeconds();
-        unsigned durationInSeconds();
-        void seekToTime(unsigned newSeekTime);
-        
-        HTTP_Stream_Position streamPositionForTime(unsigned newSeekTime);
+
+        double timePlayedInSeconds();
+        double durationInSeconds();
+        void seekToTime(double newSeekTime);
+
+        HTTP_Stream_Position streamPositionForTime(double newSeekTime);
         
         void setVolume(float volume);
         void setPlayRate(float playRate);
@@ -70,7 +70,7 @@ namespace astreamer {
         void setUrl(CFURLRef url);
         void setStrictContentTypeChecking(bool strictChecking);
         void setDefaultContentType(CFStringRef defaultContentType);
-        void setSeekPosition(unsigned seekPosition);
+        void setSeekPosition(double seekPosition);
         void setContentLength(UInt64 contentLength);
         
         void setOutputFile(CFURLRef url);
@@ -101,7 +101,7 @@ namespace astreamer {
     private:
         
         Audio_Stream(const Audio_Stream&);
-        Audio_Stream& operator=(const Audio_Stream&);
+        Audio_Stream &operator = (const Audio_Stream&);
         
         bool m_httpStreamRunning;
         bool m_audioStreamParserRunning;
@@ -124,7 +124,7 @@ namespace astreamer {
         UInt8 *m_outputBuffer;
         
         UInt64 m_dataOffset;
-        unsigned m_seekPosition;
+        double m_seekPosition;
         size_t m_bounceCount;
         CFAbsoluteTime m_firstBufferingTime;
         
@@ -162,6 +162,7 @@ namespace astreamer {
         void setState(State state);
         void setCookiesForStream(AudioFileStreamID inAudioFileStream);
         unsigned bitrate();
+        double bitrateDouble();
         
         int cachedDataCount();
         void enqueueCachedData(int minPacketsRequired);

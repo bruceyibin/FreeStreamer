@@ -176,12 +176,12 @@ public:
 - (void)stop;
 - (BOOL)isPlaying;
 - (void)pause;
-- (void)seekToTime:(unsigned)newSeekTime;
+- (void)seekToTime:(double)newSeekTime;
 - (void)setVolume:(float)volume;
 - (void)setPlayRate:(float)playRate;
-- (unsigned)timePlayedInSeconds;
-- (unsigned)durationInSeconds;
-- (astreamer::HTTP_Stream_Position)streamPositionForTime:(unsigned)newSeekTime;
+- (double)timePlayedInSeconds;
+- (double)durationInSeconds;
+- (astreamer::HTTP_Stream_Position)streamPositionForTime:(double)newSeekTime;
 
 @end
 
@@ -537,7 +537,7 @@ public:
     _audioStream->pause();
 }
 
-- (void)seekToTime:(unsigned)newSeekTime {
+- (void)seekToTime:(double)newSeekTime {
     _audioStream->seekToTime(newSeekTime);
 }
 
@@ -549,15 +549,15 @@ public:
     _audioStream->setPlayRate(playRate);
 }
 
-- (unsigned)timePlayedInSeconds {
+- (double)timePlayedInSeconds {
     return _audioStream->timePlayedInSeconds();
 }
 
-- (unsigned)durationInSeconds {
+- (double)durationInSeconds {
     return _audioStream->durationInSeconds();
 }
 
-- (astreamer::HTTP_Stream_Position)streamPositionForTime:(unsigned)newSeekTime {
+- (astreamer::HTTP_Stream_Position)streamPositionForTime:(double)newSeekTime {
     return _audioStream->streamPositionForTime(newSeekTime);
 }
 
@@ -711,6 +711,10 @@ public:
     [_private seekToTime:seekTime];
 }
 
+- (void)seekToTime:(double)seekTime {
+    [_private seekToTime:seekTime];
+}
+
 - (void)setVolume:(float)volume {
     [_private setVolume:volume];
 }
@@ -735,6 +739,11 @@ public:
     return pos;
 }
 
+- (double)currentTimePlayedDouble {
+    double u = [_private timePlayedInSeconds];
+    return u;
+}
+
 - (FSStreamPosition)duration {
     unsigned u = [_private durationInSeconds];
     
@@ -745,6 +754,11 @@ public:
     
     FSStreamPosition pos = {.minute = m, .second = s};
     return pos;
+}
+
+- (double)durationDouble {
+    double u = [_private durationInSeconds];
+    return u;
 }
 
 - (FSSeekByteOffset)currentSeekByteOffset {

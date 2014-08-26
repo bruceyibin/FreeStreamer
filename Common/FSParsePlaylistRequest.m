@@ -10,9 +10,9 @@
 #import "FSPlaylistItem.h"
 
 @interface FSParsePlaylistRequest ()
-- (void)parsePlaylistFromData:(NSData *)data;
-- (void)parsePlaylistM3U:(NSString *)playlist;
-- (void)parsePlaylistPLS:(NSString *)playlist;
+- (void)parsePlaylistFromData:(NSData *)data prefix:(NSString *)prefixString;
+- (void)parsePlaylistM3U:(NSString *)playlist prefix:(NSString *)prefixString;
+- (void)parsePlaylistPLS:(NSString *)playlist prefix:(NSString *)prefixString;
 
 @property (readonly) FSPlaylistFormat format;
 
@@ -79,28 +79,28 @@
  * =======================================
  */
 
-- (void)parsePlaylistFromData:(NSData *)data {
+- (void)parsePlaylistFromData:(NSData *)data prefix:(NSString *)prefixString {
     NSString *playlistData = [[NSString alloc] initWithData:data encoding:NSASCIIStringEncoding];
     
     if (_format == kFSPlaylistFormatM3U) {
-        [self parsePlaylistM3U:playlistData];
+        [self parsePlaylistM3U:playlistData prefix:prefixString];
         
         if ([_playlistItems count] == 0) {
             // If we failed to grab any playlist items, still try
             // to parse it in another format; perhaps the server
             // mistakingly identified the playlist format
             
-            [self parsePlaylistPLS:playlistData];
+            [self parsePlaylistPLS:playlistData prefix:prefixString];
         }
     } else if (_format == kFSPlaylistFormatPLS) {
-        [self parsePlaylistPLS:playlistData];
+        [self parsePlaylistPLS:playlistData prefix:prefixString];
         
         if ([_playlistItems count] == 0) {
             // If we failed to grab any playlist items, still try
             // to parse it in another format; perhaps the server
             // mistakingly identified the playlist format
             
-            [self parsePlaylistM3U:playlistData];
+            [self parsePlaylistM3U:playlistData prefix:prefixString];
         }
     }
     
@@ -112,7 +112,7 @@
     }
 }
 
-- (void)parsePlaylistM3U:(NSString *)playlist {
+- (void)parsePlaylistM3U:(NSString *)playlist prefix:(NSString *)prefixString {
     [_playlistItems removeAllObjects];
     
     for (NSString *line in [playlist componentsSeparatedByString:@"\n"]) {
@@ -126,11 +126,19 @@
             item.url = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
             
             [_playlistItems addObject:item];
+        } else {
+            if (line && line.length > 1) {
+                NSString *urlString = [prefixString stringByAppendingString:line];
+                DLog(@"%@", urlString);
+                FSPlaylistItem *item = [[FSPlaylistItem alloc] init];
+                item.url = [urlString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                [_playlistItems addObject:item];
+            }
         }
     }
 }
 
-- (void)parsePlaylistPLS:(NSString *)playlist {
+- (void)parsePlaylistPLS:(NSString *)playlist prefix:(NSString *)prefixString {
     [_playlistItems removeAllObjects];
     
     NSMutableDictionary *props = [[NSMutableDictionary alloc] init];
@@ -275,7 +283,10 @@
         return;
     }
     
-    [self parsePlaylistFromData:_receivedData];
+    DLog(@"%@ %@", _url, [_url URLByDeletingLastPathComponent]);
+    NSURL *prefixURL = [_url URLByDeletingLastPathComponent];
+    DLog(@"%@ %@", _url, [prefixURL absoluteString]);
+    [self parsePlaylistFromData:_receivedData prefix:[prefixURL absoluteString]];
     
     self.onCompletion();
 }

@@ -182,9 +182,9 @@ namespace astreamer {
         
         AQ_TRACE("%s: leave\n", __PRETTY_FUNCTION__);
     }
-    
-    unsigned Audio_Queue::timePlayedInSeconds() {
-        unsigned timePlayed = 0;
+
+    double Audio_Queue::timePlayedInSeconds() {
+        double timePlayed = 0;
         
         AudioTimeStamp queueTime;
         Boolean discontinuity;

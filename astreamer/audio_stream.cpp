@@ -233,16 +233,16 @@ namespace astreamer {
         audioQueue()->pause();
     }
     
-    unsigned Audio_Stream::timePlayedInSeconds() {
+    double Audio_Stream::timePlayedInSeconds() {
         if (m_audioStreamParserRunning) {
             return m_seekPosition + audioQueue()->timePlayedInSeconds();
         }
         return 0;
     }
     
-    unsigned Audio_Stream::durationInSeconds() {
-        unsigned duration = 0;
-        unsigned bitrate = this->bitrate();
+    double Audio_Stream::durationInSeconds() {
+        double duration = 0;
+        double bitrate = this->bitrateDouble();
         
         if (bitrate == 0) {
             goto out;
@@ -262,7 +262,7 @@ namespace astreamer {
         return duration;
     }
     
-    void Audio_Stream::seekToTime(unsigned newSeekTime) {
+    void Audio_Stream::seekToTime(double newSeekTime) {
         if (state() == SEEKING) {
             return;
         } else {
@@ -287,10 +287,10 @@ namespace astreamer {
         setContentLength(originalContentLength);
     }
     
-    HTTP_Stream_Position Audio_Stream::streamPositionForTime(unsigned newSeekTime) {
+    HTTP_Stream_Position Audio_Stream::streamPositionForTime(double newSeekTime) {
         HTTP_Stream_Position position;
         position.start = 0;
-        position.end   = 0;
+        position.end = 0;
         
         unsigned duration = durationInSeconds();
         if (!(duration > 0)) {
@@ -357,7 +357,7 @@ namespace astreamer {
         }
     }
     
-    void Audio_Stream::setSeekPosition(unsigned seekPosition) {
+    void Audio_Stream::setSeekPosition(double seekPosition) {
         m_seekPosition = seekPosition;
     }
     
@@ -752,6 +752,19 @@ namespace astreamer {
     }
     
     unsigned Audio_Stream::bitrate() {
+        if (m_processedPacketsCount < kAudioStreamBitrateBufferSize) {
+            return 0;
+        }
+        double sum = 0;
+        
+        for (size_t i=0; i < kAudioStreamBitrateBufferSize; i++) {
+            sum += m_bitrateBuffer[i];
+        }
+        
+        return sum / kAudioStreamBitrateBufferSize;
+    }
+    
+    double Audio_Stream::bitrateDouble() {
         if (m_processedPacketsCount < kAudioStreamBitrateBufferSize) {
             return 0;
         }

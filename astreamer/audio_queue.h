@@ -53,8 +53,8 @@ namespace astreamer {
         
         void setVolume(float volume);
         void setPlayRate(float playRate);
-        
-        unsigned timePlayedInSeconds();
+
+        double timePlayedInSeconds();
         
     private:
         Audio_Queue(const Audio_Queue&);
