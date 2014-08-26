@@ -38,15 +38,15 @@
         [systemVersion appendString:@"OS X"];
 #endif
         
-        self.bufferCount    = 8;
-        self.bufferSize     = 32768;
+        self.bufferCount = 8;
+        self.bufferSize = 32768;
         self.maxPacketDescs = 512;
         self.decodeQueueSize = 32;
         self.httpConnectionBufferSize = 1024;
         self.outputSampleRate = 44100;
         self.outputNumChannels = 2;
-        self.bounceInterval    = 10;
-        self.maxBounceCount    = 4;   // Max number of bufferings in bounceInterval seconds
+        self.bounceInterval = 10;
+        self.maxBounceCount = 10;   // Max number of bufferings in bounceInterval seconds
         self.startupWatchdogPeriod = 30; // If the stream doesn't start to play in this seconds, the watchdog will fail it
         self.maxPrebufferedByteCount = 1000000; // 1 MB
         self.userAgent = [NSString stringWithFormat:@"FreeStreamer/%@ (%@)", freeStreamerReleaseVersion(), systemVersion];
@@ -79,8 +79,8 @@
          */
         int scale = 2;
         
-        self.bufferCount    *= scale;
-        self.bufferSize     *= scale;
+        self.bufferCount *= scale;
+        self.bufferSize *= scale;
         self.maxPacketDescs *= scale;
 #endif
 #else
@@ -140,30 +140,30 @@ public:
 	AudioStreamStateObserver *_observer;
     NSString *_defaultContentType;
     Reachability *_reachability;
-    FSSeekByteOffset _lastSeekByteOffset;
 #if (__IPHONE_OS_VERSION_MIN_REQUIRED >= 40000)
     UIBackgroundTaskIdentifier _backgroundTask;
 #endif
 }
 
-@property (nonatomic,assign) NSURL *url;
-@property (nonatomic,assign) BOOL strictContentTypeChecking;
-@property (nonatomic,assign) NSString *defaultContentType;
-@property (nonatomic,assign) NSString *contentType;
-@property (nonatomic,assign) NSString *suggestedFileExtension;
-@property (nonatomic,assign) NSURL *outputFile;
-@property (nonatomic,assign) BOOL wasInterrupted;
-@property (nonatomic,assign) BOOL wasDisconnected;
-@property (nonatomic,assign) BOOL wasContinuousStream;
+@property (nonatomic, assign) NSURL *url;
+@property (nonatomic, assign) BOOL strictContentTypeChecking;
+@property (nonatomic, assign) NSString *defaultContentType;
+@property (nonatomic, assign) NSString *contentType;
+@property (nonatomic, assign) NSString *suggestedFileExtension;
+@property (nonatomic, assign) NSURL *outputFile;
+@property (nonatomic, assign) BOOL wasInterrupted;
+@property (nonatomic, assign) BOOL wasDisconnected;
+@property (nonatomic, assign) BOOL wasContinuousStream;
 @property (readonly) size_t prebufferedByteCount;
 @property (readonly) FSSeekByteOffset currentSeekByteOffset;
+@property (nonatomic, assign) FSSeekByteOffset lastSeekByteOffset;
 @property (readonly) FSStreamConfiguration *configuration;
 @property (readonly) NSString *formatDescription;
 @property (copy) void (^onCompletion)();
 @property (copy) void (^onFailure)();
-@property (nonatomic,assign) FSAudioStreamError lastError;
-@property (nonatomic,unsafe_unretained) id<FSPCMAudioStreamDelegate> delegate;
-@property (nonatomic,unsafe_unretained) FSAudioStream *stream;
+@property (nonatomic, assign) FSAudioStreamError lastError;
+@property (nonatomic, unsafe_unretained) id<FSPCMAudioStreamDelegate> delegate;
+@property (nonatomic, unsafe_unretained) FSAudioStream *stream;
 
 - (AudioStreamStateObserver *)streamStateObserver;
 
@@ -838,7 +838,8 @@ void AudioStreamStateObserver::audioStreamErrorOccurred(int errorCode) {
             break;
         case kFsAudioStreamErrorNetwork:
             priv.lastError = kFsAudioStreamErrorNetwork;
-            
+//            priv.lastSeekByteOffset = [priv currentSeekByteOffset];
+
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
             NSLog(@"FSAudioStream: Network error: %@", priv);
 #endif
@@ -894,7 +895,7 @@ void AudioStreamStateObserver::audioStreamStateChanged(astreamer::Audio_Stream::
             break;
         case astreamer::Audio_Stream::PLAYING:
             priv.lastError = kFsAudioStreamErrorNone;
-            m_eofReached = false;
+//            m_eofReached = false;
             fsAudioState = [NSNumber numberWithInt:kFsAudioStreamPlaying];
 #if (__IPHONE_OS_VERSION_MIN_REQUIRED >= 40000)
             [[AVAudioSession sharedInstance] setActive:YES error:nil];

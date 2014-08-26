@@ -139,7 +139,7 @@ static NSMutableArray *notificationQueue = nil;       // Global notification que
 
 + (AJNotificationView *)showNoticeInView:(UIView *)view type:(AJNotificationType)type title:(NSString *)title linedBackground:(AJLinedBackgroundType)backgroundType hideAfter:(NSTimeInterval)hideInterval response:(void (^)(void))response {
     
-    return [self showNoticeInView:view type:type title:title linedBackground:backgroundType hideAfter:hideInterval offset:0.0 delay:0.0 detailDisclosure:NO response:response];
+    return [self showNoticeInView:view type:type title:title linedBackground:backgroundType hideAfter:hideInterval offset:130.0 delay:0.0 detailDisclosure:NO response:response];
 }
 
 + (AJNotificationView *)showNoticeInView:(UIView *)view type:(AJNotificationType)type title:(NSString *)title linedBackground:(AJLinedBackgroundType)backgroundType hideAfter:(NSTimeInterval)hideInterval offset:(float)offset {

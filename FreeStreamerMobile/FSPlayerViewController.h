@@ -27,6 +27,7 @@
     // State
     BOOL _paused;
     BOOL _shouldStartPlaying;
+    float _outputVolume;
     
     // UI
     NSTimer *_progressUpdateTimer;
@@ -66,6 +67,10 @@
  */
 @property (nonatomic,strong) IBOutlet UISlider *progressSlider;
 /**
+ * Reference to the volume slider.
+ */
+@property (nonatomic,strong) IBOutlet UISlider *volumeSlider;
+/**
  * Reference to the status label.
  */
 @property (nonatomic,strong) IBOutlet UILabel *statusLabel;
@@ -85,7 +90,10 @@
  * Reference to the frequency plot.
  */
 @property (nonatomic,strong) IBOutlet FSFrequencyPlotView *frequencyPlotView;
-
+/**
+ * Reference to the buffering indicator.
+ */
+@property (nonatomic,strong) IBOutlet UIProgressView *bufferingIndicator;
 /**
  * Handles the notification upon the audio stream state change.
  *
@@ -133,5 +141,11 @@
  * @param sender The sender of the action.
  */
 - (IBAction)openStationUrl:(id)sender;
+/**
+ * An action for changing the volume.
+ *
+ * @param sender The sender of the action.
+ */
+- (IBAction)changeVolume:(id)sender;
 
 @end

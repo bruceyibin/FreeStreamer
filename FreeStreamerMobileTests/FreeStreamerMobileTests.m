@@ -34,6 +34,9 @@
     _controller = [[FSAudioController alloc] init];
     _keepRunning = YES;
     _checkStreamState = NO;
+    
+    [_stream setVolume:0];
+    [_controller setVolume:0];
 }
 
 - (void)tearDown
@@ -101,7 +104,6 @@
                                                       
                                                       if (state == kFsAudioStreamPlaying) {
                                                           _checkStreamState = YES;
-                                                          [_controller setVolume:0];
                                                       }
                                                   }];
     
@@ -123,6 +125,56 @@
             XCTAssertTrue(([_controller.stream.contentType isEqualToString:@"audio/mpeg"]), @"Invalid content type");
             XCTAssertTrue(([_controller.stream.suggestedFileExtension isEqualToString:@"mp3"]), @"Invalid file extension");
             
+            XCTAssertTrue((_controller.stream.prebufferedByteCount > 0), @"No cached bytes");
+            
+            return;
+        }
+    }
+    XCTAssertFalse(timedOut, @"Timed out - the stream did not start playing");
+}
+
+- (void)testStreamPausing
+{
+    [[NSNotificationCenter defaultCenter] addObserverForName:FSAudioStreamStateChangeNotification
+                                                      object:nil
+                                                       queue:nil
+                                                  usingBlock:^(NSNotification *notification) {
+                                                      
+                                                      NSLog(@"FSAudioStreamStateChangeNotification received!");
+                                                      
+                                                      int state = [[notification.userInfo valueForKey:FSAudioStreamNotificationKey_State] intValue];
+                                                      
+                                                      if (state == kFsAudioStreamPlaying) {
+                                                          _checkStreamState = YES;
+                                                          
+                                                          XCTAssertTrue(([_controller isPlaying]), @"State must be playing when the player is not paused");
+                                                      }
+                                                      
+                                                      if (state == kFsAudioStreamPaused) {
+                                                          XCTAssertTrue((![_controller isPlaying]), @"State must not be playing when the player is paused");
+                                                          
+                                                          _keepRunning = NO;
+                                                      }
+                                                  }];
+    
+    _controller.url = [NSURL URLWithString:@"http://www.radioswissjazz.ch/live/mp3.m3u"];
+    [_controller play];
+    
+    NSTimeInterval timeout = 15.0;
+    NSTimeInterval idle = 0.1;
+    BOOL timedOut = NO;
+    
+    NSDate *timeoutDate = [[NSDate alloc] initWithTimeIntervalSinceNow:timeout];
+    while (!timedOut && _keepRunning) {
+        NSDate *tick = [[NSDate alloc] initWithTimeIntervalSinceNow:idle];
+        [[NSRunLoop currentRunLoop] runUntilDate:tick];
+        timedOut = ([tick compare:timeoutDate] == NSOrderedDescending);
+        
+        if (_checkStreamState) {
+            // Stream started playing.
+            
+            [_controller pause];
+            
             return;
         }
     }
@@ -142,9 +194,6 @@
                                                       
                                                       if (state == kFsAudioStreamPlaying) {
                                                           _checkStreamState = YES;
-                                                          
-                                                          // Set the stream silent, better for testing
-                                                          [_stream setVolume:0];
                                                       }
                                                   }];
     
@@ -194,7 +243,6 @@
                                                       
                                                       if (state == kFsAudioStreamPlaying) {
                                                           _checkStreamState = YES;
-                                                          [_controller setVolume:0];
                                                       }
                                                   }];
     
@@ -235,9 +283,6 @@
                                                       
                                                       if (state == kFsAudioStreamPlaying) {
                                                           _checkStreamState = YES;
-                                                          
-                                                          // Set the stream silent, better for testing
-                                                          [_controller setVolume:0];
                                                       }
                                                   }];
     
