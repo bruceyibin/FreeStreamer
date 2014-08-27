@@ -39,7 +39,6 @@ namespace astreamer {
     m_readStream(0),
     m_scheduledInRunLoop(false),
     m_readPending(false),
-    m_delegate(0),
     m_url(0),
     m_httpHeadersParsed(false),
     m_contentType(0),
@@ -93,7 +92,7 @@ namespace astreamer {
         delete m_id3Parser, m_id3Parser = 0;
     }
     
-    HTTP_Stream_Position HTTP_Stream::position() {
+    Input_Stream_Position HTTP_Stream::position() {
         return m_position;
     }
     
@@ -106,7 +105,7 @@ namespace astreamer {
     }
     
     bool HTTP_Stream::open() {
-        HTTP_Stream_Position position;
+        Input_Stream_Position position;
         position.start = 0;
         position.end = 0;
         
@@ -118,7 +117,7 @@ namespace astreamer {
         return open(position);
     }
     
-    bool HTTP_Stream::open(const HTTP_Stream_Position &position) {
+    bool HTTP_Stream::open(const Input_Stream_Position& position) {
         bool success = false;
         CFStreamClientContext CTX = { 0, this, NULL, NULL, NULL };
         
@@ -236,6 +235,27 @@ namespace astreamer {
         } else {
             m_url = NULL;
         }
+    }
+    
+    bool HTTP_Stream::canHandleUrl(CFURLRef url) {
+        if (!url) {
+            return false;
+        }
+        
+        CFStringRef scheme = CFURLCopyScheme(url);
+        
+        if (scheme) {
+            if (CFStringCompare(scheme, CFSTR("file"), 0) == kCFCompareEqualTo) {
+                CFRelease(scheme);
+                
+                // The only scheme we claim not to handle are local files.
+                return false;
+            }
+            
+            CFRelease(scheme);
+        }
+        
+        return true;
     }
     
     void HTTP_Stream::id3metaDataAvailable(std::map<CFStringRef,CFStringRef> metaData) {

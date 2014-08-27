@@ -9,7 +9,7 @@
 #ifndef ASTREAMER_AUDIO_STREAM_H
 #define ASTREAMER_AUDIO_STREAM_H
 
-#import "http_stream.h"
+#import "input_stream.h"
 #include "audio_queue.h"
 
 #include <AudioToolbox/AudioToolbox.h>
@@ -36,7 +36,8 @@ namespace astreamer {
     
 #define kAudioStreamBitrateBufferSize 50
 	
-    class Audio_Stream : public HTTP_Stream_Delegate, public Audio_Queue_Delegate {
+    class Audio_Stream : public Input_Stream_Delegate, public Audio_Queue_Delegate {
+
     public:
         Audio_Stream_Delegate *m_delegate;
         
@@ -54,7 +55,7 @@ namespace astreamer {
         virtual ~Audio_Stream();
         
         void open();
-        void open(HTTP_Stream_Position *position);
+        void open(Input_Stream_Position *position);
         void close();
         void pause();
 
@@ -62,7 +63,7 @@ namespace astreamer {
         double durationInSeconds();
         void seekToTime(double newSeekTime);
 
-        HTTP_Stream_Position streamPositionForTime(double newSeekTime);
+        Input_Stream_Position streamPositionForTime(double newSeekTime);
         
         void setVolume(float volume);
         void setPlayRate(float playRate);
@@ -91,7 +92,7 @@ namespace astreamer {
         void audioQueueInitializationFailed();
         void audioQueueFinishedPlayingPacket();
         
-        /* HTTP_Stream_Delegate */
+        /* Input_Stream_Delegate */
         void streamIsReadyRead();
         void streamHasBytesAvailable(UInt8 *data, UInt32 numBytes);
         void streamEndEncountered();
@@ -103,13 +104,13 @@ namespace astreamer {
         Audio_Stream(const Audio_Stream&);
         Audio_Stream &operator = (const Audio_Stream&);
         
-        bool m_httpStreamRunning;
+        bool m_inputStreamRunning;
         bool m_audioStreamParserRunning;
         
         UInt64 m_contentLength;
         
         State m_state;
-        HTTP_Stream *m_httpStream;
+        Input_Stream *m_inputStream;
         Audio_Queue *m_audioQueue;
         
         CFRunLoopTimerRef m_watchdogTimer;

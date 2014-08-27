@@ -9,6 +9,8 @@
 #include "audio_stream.h"
 #include "file_output.h"
 #include "stream_configuration.h"
+#include "http_stream.h"
+#include "file_stream.h"
 
 /*
  * Some servers may send an incorrect MIME type for the audio stream.
@@ -31,11 +33,11 @@ namespace astreamer {
     /* Create HTTP stream as Audio_Stream (this) as the delegate */
     Audio_Stream::Audio_Stream() :
     m_delegate(0),
-    m_httpStreamRunning(false),
+    m_inputStreamRunning(false),
     m_audioStreamParserRunning(false),
     m_contentLength(0),
     m_state(STOPPED),
-    m_httpStream(new HTTP_Stream()),
+    m_inputStream(0),
     m_audioQueue(0),
     m_watchdogTimer(0),
     m_audioFileStream(0),
@@ -66,10 +68,7 @@ namespace astreamer {
     m_bitrateBufferIndex(0),
     m_outputVolume(1.0),
     m_queueCanAcceptPackets(true) {
-        m_httpStream->m_delegate = this;
-        
         memset(&m_srcFormat, 0, sizeof m_srcFormat);
-        
         memset(&m_dstFormat, 0, sizeof m_dstFormat);
         
         Stream_Configuration *config = Stream_Configuration::configuration();
@@ -97,8 +96,10 @@ namespace astreamer {
         
         delete [] m_outputBuffer, m_outputBuffer = 0;
         
-        m_httpStream->m_delegate = 0;
-        delete m_httpStream, m_httpStream = 0;
+        if (m_inputStream) {
+            m_inputStream->m_delegate = 0;
+            delete m_inputStream, m_inputStream = 0;
+        }
         
         if (m_audioConverter) {
             AudioConverterDispose(m_audioConverter), m_audioConverter = 0;
@@ -113,8 +114,9 @@ namespace astreamer {
         open(0);
     }
     
-    void Audio_Stream::open(HTTP_Stream_Position *position) {
-        if (m_httpStreamRunning || m_audioStreamParserRunning) {
+    void Audio_Stream::open(Input_Stream_Position *position)
+    {
+        if (m_inputStreamRunning || m_audioStreamParserRunning) {
             AS_TRACE("%s: already running: return\n", __PRETTY_FUNCTION__);
             return;
         }
@@ -138,17 +140,21 @@ namespace astreamer {
             CFRelease(m_contentType), m_contentType = NULL;
         }
         
-        bool success;
+        bool success = false;
         
         if (position) {
-            success = m_httpStream->open(*position);
+            if (m_inputStream) {
+                success = m_inputStream->open(*position);
+            }
         } else {
-            success = m_httpStream->open();
+            if (m_inputStream) {
+                success = m_inputStream->open();
+            }
         }
         
         if (success) {
             AS_TRACE("%s: HTTP stream opened, buffering...\n", __PRETTY_FUNCTION__);
-            m_httpStreamRunning = true;
+            m_inputStreamRunning = true;
             setState(BUFFERING);
             
             if (config->startupWatchdogPeriod > 0) {
@@ -188,9 +194,11 @@ namespace astreamer {
         
         /* Close the HTTP stream first so that the audio stream parser
          isn't fed with more data to parse */
-        if (m_httpStreamRunning) {
-            m_httpStream->close();
-            m_httpStreamRunning = false;
+        if (m_inputStreamRunning) {
+            if (m_inputStream) {
+                m_inputStream->close();
+            }
+            m_inputStreamRunning = false;
         }
         
         if (m_audioStreamParserRunning) {
@@ -268,8 +276,8 @@ namespace astreamer {
         } else {
             setState(SEEKING);
         }
-        
-        HTTP_Stream_Position position = streamPositionForTime(newSeekTime);
+
+        Input_Stream_Position position = streamPositionForTime(newSeekTime);
         
         if (position.start == 0 && position.end == 0) {
             return;
@@ -287,12 +295,13 @@ namespace astreamer {
         setContentLength(originalContentLength);
     }
     
-    HTTP_Stream_Position Audio_Stream::streamPositionForTime(double newSeekTime) {
-        HTTP_Stream_Position position;
+
+    Input_Stream_Position Audio_Stream::streamPositionForTime(double newSeekTime) {
+        Input_Stream_Position position;
         position.start = 0;
         position.end = 0;
         
-        unsigned duration = durationInSeconds();
+        double duration = durationInSeconds();
         if (!(duration > 0)) {
             return position;
         }
@@ -341,7 +350,20 @@ namespace astreamer {
     }
     
     void Audio_Stream::setUrl(CFURLRef url) {
-        m_httpStream->setUrl(url);
+        if (m_inputStream) {
+            delete m_inputStream, m_inputStream = 0;
+        }
+        
+        if (HTTP_Stream::canHandleUrl(url)) {
+            m_inputStream = new HTTP_Stream();
+            m_inputStream->m_delegate = this;
+        } else if (File_Stream::canHandleUrl(url)) {
+            m_inputStream = new File_Stream();
+            m_inputStream->m_delegate = this;
+        }
+        if (m_inputStream) {
+            m_inputStream->setUrl(url);
+        }
     }
     
     void Audio_Stream::setStrictContentTypeChecking(bool strictChecking) {
@@ -468,7 +490,7 @@ namespace astreamer {
         
         Stream_Configuration *config = Stream_Configuration::configuration();
         
-        if (m_httpStreamRunning && FAILED != state()) {
+        if (m_inputStreamRunning && FAILED != state()) {
             /* Still feeding the audio queue with data,
              don't stop yet */
             setState(BUFFERING);
@@ -532,9 +554,11 @@ namespace astreamer {
     }
     
     void Audio_Stream::audioQueueInitializationFailed() {
-        if (m_httpStreamRunning) {
-            m_httpStream->close();
-            m_httpStreamRunning = false;
+        if (m_inputStreamRunning) {
+            if (m_inputStream) {
+                m_inputStream->close();
+            }
+            m_inputStreamRunning = false;
         }
         
         setState(FAILED);
@@ -568,7 +592,10 @@ namespace astreamer {
         const CFIndex audioContentTypeLength = CFStringGetLength(audioContentType);
         bool matchesAudioContentType = false;
         
-        CFStringRef contentType = m_httpStream->contentType();
+        CFStringRef contentType = 0;
+        if (m_inputStream) {
+            contentType = m_inputStream->contentType();
+        }
         
         if (m_contentType) {
             CFRelease(m_contentType), m_contentType = 0;
@@ -608,7 +635,7 @@ namespace astreamer {
     void Audio_Stream::streamHasBytesAvailable(UInt8 *data, UInt32 numBytes) {
         AS_TRACE("%s: %u bytes\n", __FUNCTION__, (unsigned int)numBytes);
         
-        if (!m_httpStreamRunning) {
+        if (!m_inputStreamRunning) {
             AS_TRACE("%s: stray callback detected!\n", __PRETTY_FUNCTION__);
             return;
         }
@@ -636,21 +663,23 @@ namespace astreamer {
     void Audio_Stream::streamEndEncountered() {
         AS_TRACE("%s\n", __PRETTY_FUNCTION__);
         
-        if (!m_httpStreamRunning) {
+        if (!m_inputStreamRunning) {
             AS_TRACE("%s: stray callback detected!\n", __PRETTY_FUNCTION__);
             return;
         }
         
         setState(END_OF_FILE);
         
-        m_httpStream->close();
-        m_httpStreamRunning = false;
+        if (m_inputStream) {
+            m_inputStream->close();
+        }
+        m_inputStreamRunning = false;
     }
     
     void Audio_Stream::streamErrorOccurred() {
         AS_TRACE("%s\n", __PRETTY_FUNCTION__);
         
-        if (!m_httpStreamRunning) {
+        if (!m_inputStreamRunning) {
             AS_TRACE("%s: stray callback detected!\n", __PRETTY_FUNCTION__);
             return;
         }
@@ -695,7 +724,9 @@ namespace astreamer {
     
     UInt64 Audio_Stream::contentLength() {
         if (m_contentLength == 0) {
-            m_contentLength = m_httpStream->contentLength();
+            if (m_inputStream) {
+                m_contentLength = m_inputStream->contentLength();
+            }
         }
         return m_contentLength;
     }
@@ -861,8 +892,10 @@ namespace astreamer {
                     
                     if (m_cachedDataSize < config->maxPrebufferedByteCount) {
                         AS_TRACE("Cache underflow, enabling the HTTP stream\n");
-                        
-                        m_httpStream->setScheduledInRunLoop(true);
+
+                        if (m_inputStream) {
+                            m_inputStream->setScheduledInRunLoop(true);
+                        }
                     }
                     
                     free(cur);
@@ -1057,8 +1090,10 @@ namespace astreamer {
             
             if (THIS->m_cachedDataSize >= config->maxPrebufferedByteCount) {
                 AS_TRACE("Cache overflow, disabling the HTTP stream\n");
-                
-                THIS->m_httpStream->setScheduledInRunLoop(false);
+
+                if (THIS->m_inputStream) {
+                    THIS->m_inputStream->setScheduledInRunLoop(false);
+                }
             }
         }
         
