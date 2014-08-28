@@ -12,7 +12,7 @@
 
 #include "audio_stream.h"
 #include "stream_configuration.h"
-#include "http_stream.h"
+#include "input_stream.h"
 
 #import <AVFoundation/AVFoundation.h>
 
@@ -40,16 +40,16 @@
         
         self.bufferCount = 8;
         self.bufferSize = 32768;
-        self.maxPacketDescs = 512;
+        self.maxPacketDescs = 1024;
         self.decodeQueueSize = 32;
-        self.httpConnectionBufferSize = 1024;
+        self.httpConnectionBufferSize = 16384;
         self.outputSampleRate = 44100;
         self.outputNumChannels = 2;
         self.bounceInterval = 10;
         self.maxBounceCount = 10;   // Max number of bufferings in bounceInterval seconds
         self.startupWatchdogPeriod = 30; // If the stream doesn't start to play in this seconds, the watchdog will fail it
-        self.maxPrebufferedByteCount = 1000000; // 1 MB
-        self.userAgent = [NSString stringWithFormat:@"FreeStreamer/%@ (%@)", freeStreamerReleaseVersion(), systemVersion];
+        self.maxPrebufferedByteCount = 524288; // 512KB
+        self.userAgent = userAgent();
         
 #if (__IPHONE_OS_VERSION_MIN_REQUIRED >= 60000)
         AVAudioSession *session = [AVAudioSession sharedInstance];
@@ -79,8 +79,8 @@
          */
         int scale = 2;
         
-        self.bufferCount *= scale;
-        self.bufferSize *= scale;
+        self.bufferCount    *= scale;
+        self.bufferSize     *= scale;
         self.maxPacketDescs *= scale;
 #endif
 #else
@@ -95,12 +95,23 @@
 
 @end
 
-NSString *freeStreamerReleaseVersion() {
-    NSString *version = [NSString stringWithFormat:@"%i.%i.%i",
-                         FREESTREAMER_VERSION_MAJOR,
-                         FREESTREAMER_VERSION_MINOR,
-                         FREESTREAMER_VERSION_REVISION];
-    return version;
+NSString *userAgent() {
+    NSString *userAgent = nil;
+#if defined(__IPHONE_OS_VERSION_MIN_REQUIRED)
+    // User-Agent Header; see http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.43
+    userAgent = [NSString stringWithFormat:@"%@/%@.%@ (%@; iOS %@; Scale/%0.2f)",
+                 [[[NSBundle mainBundle] infoDictionary] objectForKey:(__bridge NSString *)kCFBundleExecutableKey],
+                 [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"],
+                 [[[NSBundle mainBundle] infoDictionary] objectForKey:(__bridge NSString *)kCFBundleVersionKey],
+                 [[UIDevice currentDevice] model], [[UIDevice currentDevice] systemVersion], [[UIScreen mainScreen] scale]];
+#elif defined(__MAC_OS_X_VERSION_MIN_REQUIRED)
+    userAgent = [NSString stringWithFormat:@"%@/%@.%@ (Mac OS X %@)",
+                 [[[NSBundle mainBundle] infoDictionary] objectForKey:(__bridge NSString *)kCFBundleExecutableKey],
+                 [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"],
+                 [[[NSBundle mainBundle] infoDictionary] objectForKey:(__bridge NSString *)kCFBundleVersionKey],
+                 [[NSProcessInfo processInfo] operatingSystemVersionString]];
+#endif
+    return userAgent;
 }
 
 NSString* const FSAudioStreamStateChangeNotification = @"FSAudioStreamStateChangeNotification";
@@ -115,7 +126,7 @@ NSString* const FSAudioStreamNotificationKey_MetaData = @"metadata";
 
 class AudioStreamStateObserver : public astreamer::Audio_Stream_Delegate {
 private:
-    bool m_eofReached;
+    bool m_eofReached = false;
     
 public:
     astreamer::Audio_Stream *source;
@@ -181,7 +192,7 @@ public:
 - (void)setPlayRate:(float)playRate;
 - (double)timePlayedInSeconds;
 - (double)durationInSeconds;
-- (astreamer::HTTP_Stream_Position)streamPositionForTime:(double)newSeekTime;
+- (astreamer::Input_Stream_Position)streamPositionForTime:(double)newSeekTime;
 
 @end
 
@@ -287,9 +298,9 @@ public:
 }
 
 - (void)playFromOffset:(FSSeekByteOffset)offset {
-    astreamer::HTTP_Stream_Position position;
+    astreamer::Input_Stream_Position position;
     position.start = offset.start;
-    position.end   = offset.end;
+    position.end = offset.end;
     
     _audioStream->open(&position);
     
@@ -385,7 +396,7 @@ public:
     
     offset.position = [self timePlayedInSeconds];
     
-    astreamer::HTTP_Stream_Position httpStreamPos = [self streamPositionForTime:offset.position];
+    astreamer::Input_Stream_Position httpStreamPos = [self streamPositionForTime:offset.position];
     
     offset.start = httpStreamPos.start;
     offset.end   = httpStreamPos.end;
@@ -430,17 +441,18 @@ public:
     if ([self isPlaying] && !internetConnectionAvailable) {
         self.wasDisconnected = YES;
         _lastSeekByteOffset = [self currentSeekByteOffset];
+        _lastError = kFsAudioStreamErrorNetwork;
         
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-        NSLog(@"FSAudioStream: Error: Internet connection disconnected while playing a stream.");
+        DLog(@"FSAudioStream: Error: Internet connection disconnected while playing a stream.");
 #endif
     }
     
     if (self.wasDisconnected && internetConnectionAvailable) {
         self.wasDisconnected = NO;
-        
+        _lastError = kFsAudioStreamErrorNone;
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-        NSLog(@"FSAudioStream: Internet connection available again. Restarting stream playback.");
+        DLog(@"FSAudioStream: Internet connection available again. Restarting stream playback.");
 #endif
         
         /*
@@ -471,12 +483,12 @@ public:
             
             if (self.wasContinuousStream) {
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-                NSLog(@"FSAudioStream: Interruption began. Continuous stream. Stopping the stream.");
+                DLog(@"FSAudioStream: Interruption began. Continuous stream. Stopping the stream.");
 #endif
                 [self stop];
             } else {
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-                NSLog(@"FSAudioStream: Interruption began. Non-continuous stream. Stopping the stream and saving the offset.");
+                DLog(@"FSAudioStream: Interruption began. Non-continuous stream. Stopping the stream and saving the offset.");
 #endif
                 _lastSeekByteOffset = [self currentSeekByteOffset];
                 [self stop];
@@ -490,7 +502,7 @@ public:
             
             if (self.wasContinuousStream) {
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-                NSLog(@"FSAudioStream: Interruption ended. Continuous stream. Starting the playback.");
+                DLog(@"FSAudioStream: Interruption ended. Continuous stream. Starting the playback.");
 #endif
                 /*
                  * Resume playing.
@@ -498,7 +510,7 @@ public:
                 [self play];
             } else {
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-                NSLog(@"FSAudioStream: Interruption ended. Continuous stream. Playing from the offset");
+                DLog(@"FSAudioStream: Interruption ended. Continuous stream. Playing from the offset");
 #endif
                 /*
                  * Resume playing.
@@ -557,13 +569,17 @@ public:
     return _audioStream->durationInSeconds();
 }
 
-- (astreamer::HTTP_Stream_Position)streamPositionForTime:(double)newSeekTime {
+- (astreamer::Input_Stream_Position)streamPositionForTime:(double)newSeekTime {
     return _audioStream->streamPositionForTime(newSeekTime);
 }
 
 - (NSString *)description {
-    return [NSString stringWithFormat:@"[FreeStreamer %@] URL: %@\nbufferCount: %i\nbufferSize: %i\nmaxPacketDescs: %i\ndecodeQueueSize: %i\nhttpConnectionBufferSize: %i\noutputSampleRate: %f\noutputNumChannels: %ld\nbounceInterval: %i\nmaxBounceCount: %i\nstartupWatchdogPeriod: %i\nmaxPrebufferedByteCount: %i\nformat: %@\nuserAgent: %@",
-            freeStreamerReleaseVersion(),
+    return [NSString stringWithFormat:@"[%@] URL: %@\nbufferCount: %i\nbufferSize: %i\n"
+            "maxPacketDescs: %i\ndecodeQueueSize: %i\nhttpConnectionBufferSize: %i\n"
+            "outputSampleRate: %f\noutputNumChannels: %ld\nbounceInterval: %i\n"
+            "maxBounceCount: %i\nstartupWatchdogPeriod: %i\n"
+            "maxPrebufferedByteCount: %i\nformat: %@\nuserAgent: %@",
+            userAgent(),
             self.url,
             self.configuration.bufferCount,
             self.configuration.bufferSize,
@@ -824,7 +840,7 @@ void AudioStreamStateObserver::audioStreamErrorOccurred(int errorCode) {
             priv.lastError = kFsAudioStreamErrorOpen;
             
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-            NSLog(@"FSAudioStream: Error opening the stream: %@", priv);
+            DLog(@"FSAudioStream: Error opening the stream: %@", priv);
 #endif
             
             break;
@@ -832,7 +848,7 @@ void AudioStreamStateObserver::audioStreamErrorOccurred(int errorCode) {
             priv.lastError = kFsAudioStreamErrorStreamParse;
             
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-            NSLog(@"FSAudioStream: Error parsing the stream: %@", priv);
+            DLog(@"FSAudioStream: Error parsing the stream: %@", priv);
 #endif
             
             break;
@@ -841,7 +857,11 @@ void AudioStreamStateObserver::audioStreamErrorOccurred(int errorCode) {
 //            priv.lastSeekByteOffset = [priv currentSeekByteOffset];
 
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-            NSLog(@"FSAudioStream: Network error: %@", priv);
+            DLog(@"FSAudioStream: Network error: %d %lld %lld \n %@",
+                 priv.lastSeekByteOffset.position,
+                 priv.lastSeekByteOffset.start,
+                 priv.lastSeekByteOffset.end,
+                 priv);
 #endif
             
             break;
@@ -849,7 +869,7 @@ void AudioStreamStateObserver::audioStreamErrorOccurred(int errorCode) {
             priv.lastError = kFsAudioStreamErrorUnsupportedFormat;
             
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-            NSLog(@"FSAudioStream: Unsupported format error: %@", priv);
+            DLog(@"FSAudioStream: Unsupported format error: %@", priv);
 #endif
             
             break;
@@ -858,7 +878,7 @@ void AudioStreamStateObserver::audioStreamErrorOccurred(int errorCode) {
             priv.lastError = kFsAudioStreamErrorStreamBouncing;
             
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-            NSLog(@"FSAudioStream: Stream bounced: %@", priv);
+            DLog(@"FSAudioStream: Stream bounced: %@", priv);
 #endif
             
             break;

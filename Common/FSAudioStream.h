@@ -10,37 +10,22 @@
 #import <CoreAudio/CoreAudioTypes.h>
 
 /**
- * The major version of the current release.
- */
-#define FREESTREAMER_VERSION_MAJOR 2
-
-/**
- * The minor version of the current release.
- */
-#define FREESTREAMER_VERSION_MINOR 4
-
-/**
- * The reversion of the current release
- */
-#define FREESTREAMER_VERSION_REVISION 3
-
-/**
  * Follow this notification for the audio stream state changes.
  */
-extern NSString* const FSAudioStreamStateChangeNotification;
-extern NSString* const FSAudioStreamNotificationKey_State;
+extern NSString *const FSAudioStreamStateChangeNotification;
+extern NSString *const FSAudioStreamNotificationKey_State;
 
 /**
  * Follow this notification for the audio stream errors.
  */
-extern NSString* const FSAudioStreamErrorNotification;
-extern NSString* const FSAudioStreamNotificationKey_Error;
+extern NSString *const FSAudioStreamErrorNotification;
+extern NSString *const FSAudioStreamNotificationKey_Error;
 
 /**
  * Follow this notification for the audio stream metadata.
  */
-extern NSString* const FSAudioStreamMetaDataNotification;
-extern NSString* const FSAudioStreamNotificationKey_MetaData;
+extern NSString *const FSAudioStreamMetaDataNotification;
+extern NSString *const FSAudioStreamNotificationKey_MetaData;
 
 /**
  * The audio stream state.
@@ -145,7 +130,7 @@ typedef struct {
 
 @end
 
-NSString *freeStreamerReleaseVersion();
+NSString *userAgent();
 
 /**
  * FSAudioStream is a class for streaming audio files from an URL.
