@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		233823D219AEEDE40095D150 /* file_stream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 233823CE19AEEDE40095D150 /* file_stream.cpp */; };
+		233823D319AEEDE40095D150 /* input_stream.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 233823D019AEEDE40095D150 /* input_stream.cpp */; };
 		60412CD218D0B150007A0277 /* button-pause.png in Resources */ = {isa = PBXBuildFile; fileRef = 60412CCC18D0B150007A0277 /* button-pause.png */; };
 		60412CD318D0B150007A0277 /* button-play.png in Resources */ = {isa = PBXBuildFile; fileRef = 60412CCD18D0B150007A0277 /* button-play.png */; };
 		60412CD418D0B150007A0277 /* player-bg-bottom.png in Resources */ = {isa = PBXBuildFile; fileRef = 60412CCE18D0B150007A0277 /* player-bg-bottom.png */; };
@@ -63,6 +65,10 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		233823CE19AEEDE40095D150 /* file_stream.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = file_stream.cpp; sourceTree = "<group>"; };
+		233823CF19AEEDE40095D150 /* file_stream.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = file_stream.h; sourceTree = "<group>"; };
+		233823D019AEEDE40095D150 /* input_stream.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = input_stream.cpp; sourceTree = "<group>"; };
+		233823D119AEEDE40095D150 /* input_stream.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = input_stream.h; sourceTree = "<group>"; };
 		60412CCC18D0B150007A0277 /* button-pause.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "button-pause.png"; path = "Assets/Images/button-pause.png"; sourceTree = "<group>"; };
 		60412CCD18D0B150007A0277 /* button-play.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "button-play.png"; path = "Assets/Images/button-play.png"; sourceTree = "<group>"; };
 		60412CCE18D0B150007A0277 /* player-bg-bottom.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "player-bg-bottom.png"; path = "Assets/Images/player-bg-bottom.png"; sourceTree = "<group>"; };
@@ -262,6 +268,10 @@
 		60CF8BCA18C5332F00C657A8 /* astreamer */ = {
 			isa = PBXGroup;
 			children = (
+				233823CE19AEEDE40095D150 /* file_stream.cpp */,
+				233823CF19AEEDE40095D150 /* file_stream.h */,
+				233823D019AEEDE40095D150 /* input_stream.cpp */,
+				233823D119AEEDE40095D150 /* input_stream.h */,
 				60CF8BCB18C5332F00C657A8 /* audio_queue.cpp */,
 				60CF8BCC18C5332F00C657A8 /* audio_queue.h */,
 				60CF8BCD18C5332F00C657A8 /* audio_stream.cpp */,
@@ -416,8 +426,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				60CF8BFF18C5337000C657A8 /* FSCheckContentTypeRequest.m in Sources */,
+				233823D319AEEDE40095D150 /* input_stream.cpp in Sources */,
 				60CF8C0318C5337000C657A8 /* FSXMLHttpRequest.m in Sources */,
 				60CF8C0018C5337000C657A8 /* FSParsePlaylistRequest.m in Sources */,
+				233823D219AEEDE40095D150 /* file_stream.cpp in Sources */,
 				60B813E218C532F8001CC5A7 /* main.m in Sources */,
 				60CF8BE018C5333B00C657A8 /* FSFrequencyPlotView.m in Sources */,
 				60CF8BD818C5332F00C657A8 /* http_stream.cpp in Sources */,
