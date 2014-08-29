@@ -743,36 +743,12 @@ public:
     return [_private isPlaying];
 }
 
-- (FSStreamPosition)currentTimePlayed {
-    unsigned u = [_private timePlayedInSeconds];
-    
-    unsigned s,m;
-    
-    s = u % 60, u /= 60;
-    m = u;
-    
-    FSStreamPosition pos = {.minute = m, .second = s};
-    return pos;
-}
-
-- (double)currentTimePlayedDouble {
+- (double)currentTimePlayed {
     double u = [_private timePlayedInSeconds];
     return u;
 }
 
-- (FSStreamPosition)duration {
-    unsigned u = [_private durationInSeconds];
-    
-    unsigned s,m;
-    
-    s = u % 60, u /= 60;
-    m = u;
-    
-    FSStreamPosition pos = {.minute = m, .second = s};
-    return pos;
-}
-
-- (double)durationDouble {
+- (double)duration {
     double u = [_private durationInSeconds];
     return u;
 }
@@ -782,7 +758,11 @@ public:
 }
 
 - (BOOL)continuous {
-    FSStreamPosition duration = self.duration;
+    unsigned u, s, m;
+    u = self.duration;
+    s = u % 60, u /= 60;
+    m = u;
+    FSStreamPosition duration = {.minute = m, .second = s};
     return (duration.minute == 0 && duration.second == 0);
 }
 
@@ -915,7 +895,7 @@ void AudioStreamStateObserver::audioStreamStateChanged(astreamer::Audio_Stream::
             break;
         case astreamer::Audio_Stream::PLAYING:
             priv.lastError = kFsAudioStreamErrorNone;
-//            m_eofReached = false;
+            m_eofReached = false;
             fsAudioState = [NSNumber numberWithInt:kFsAudioStreamPlaying];
 #if (__IPHONE_OS_VERSION_MIN_REQUIRED >= 40000)
             [[AVAudioSession sharedInstance] setActive:YES error:nil];

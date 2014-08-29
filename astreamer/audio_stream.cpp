@@ -91,7 +91,7 @@ namespace astreamer {
         if (m_contentType) {
             CFRelease(m_contentType), m_contentType = NULL;
         }
-        
+
         close();
         
         delete [] m_outputBuffer, m_outputBuffer = 0;
@@ -210,7 +210,7 @@ namespace astreamer {
             }
             m_audioStreamParserRunning = false;
         }
-        
+
         closeAudioQueue();
         
         if (FAILED != state()) {
@@ -250,7 +250,7 @@ namespace astreamer {
     
     double Audio_Stream::durationInSeconds() {
         double duration = 0;
-        double bitrate = this->bitrateDouble();
+        double bitrate = this->bitrate();
         
         if (bitrate == 0) {
             goto out;
@@ -284,7 +284,7 @@ namespace astreamer {
         }
         
         UInt64 originalContentLength = m_contentLength;
-        
+
         close();
         
         AS_TRACE("Seeking position %llu\n", position.start);
@@ -540,7 +540,6 @@ namespace astreamer {
             enqueueCachedData(1);
         } else {
             AS_TRACE("%s: closing the audio queue\n", __PRETTY_FUNCTION__);
-            
             close();
         }
     }
@@ -767,7 +766,7 @@ namespace astreamer {
         }
         
         // get the cookie data
-        void* cookieData = calloc(1, cookieSize);
+        void *cookieData = calloc(1, cookieSize);
         err = AudioFileStreamGetProperty(inAudioFileStream, kAudioFileStreamProperty_MagicCookieData, &cookieSize, cookieData);
         if (err) {
             free(cookieData);
@@ -782,20 +781,7 @@ namespace astreamer {
         free(cookieData);
     }
     
-    unsigned Audio_Stream::bitrate() {
-        if (m_processedPacketsCount < kAudioStreamBitrateBufferSize) {
-            return 0;
-        }
-        double sum = 0;
-        
-        for (size_t i=0; i < kAudioStreamBitrateBufferSize; i++) {
-            sum += m_bitrateBuffer[i];
-        }
-        
-        return sum / kAudioStreamBitrateBufferSize;
-    }
-    
-    double Audio_Stream::bitrateDouble() {
+    double Audio_Stream::bitrate() {
         if (m_processedPacketsCount < kAudioStreamBitrateBufferSize) {
             return 0;
         }

@@ -518,14 +518,21 @@
         self.progressSlider.value = 0;
         self.currentPlaybackTime.text = @"";
     } else {
-        double s = self.audioController.stream.currentTimePlayed.minute * 60 + self.audioController.stream.currentTimePlayed.second;
-        double e = self.audioController.stream.duration.minute * 60 + self.audioController.stream.duration.second;
+        double s = self.audioController.stream.currentTimePlayed;
+        double e = self.audioController.stream.duration;
         
         self.progressSlider.enabled = YES;
         self.progressSlider.value = s / e;
         
-        FSStreamPosition cur = self.audioController.stream.currentTimePlayed;
-        FSStreamPosition end = self.audioController.stream.duration;
+        unsigned u, se, m;
+        u = s;
+        se = u % 60, u /= 60;
+        m = u;
+        FSStreamPosition cur = {.minute = m, .second = se};
+        u = e;
+        se = u % 60, u /= 60;
+        m = u;
+        FSStreamPosition end = {.minute = m, .second = se};
         
         self.currentPlaybackTime.text = [NSString stringWithFormat:@"%i:%02i / %i:%02i",
                                          cur.minute, cur.second,
@@ -541,9 +548,9 @@
 {
     self.progressSlider.enabled = NO;
     
-    unsigned u = (self.audioController.stream.duration.minute * 60 + self.audioController.stream.duration.second) * _seekToPoint;
+    unsigned u = self.audioController.stream.duration * _seekToPoint;
     
-    unsigned s,m;
+    unsigned s, m;
     
     s = u % 60, u /= 60;
     m = u;

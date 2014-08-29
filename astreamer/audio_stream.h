@@ -53,7 +53,7 @@ namespace astreamer {
         
         Audio_Stream();
         virtual ~Audio_Stream();
-        
+
         void open();
         void open(Input_Stream_Position *position);
         void close();
@@ -103,7 +103,7 @@ namespace astreamer {
         
         Audio_Stream(const Audio_Stream&);
         Audio_Stream &operator = (const Audio_Stream&);
-        
+
         bool m_inputStreamRunning;
         bool m_audioStreamParserRunning;
         
@@ -162,8 +162,7 @@ namespace astreamer {
         void closeAndSignalError(int error);
         void setState(State state);
         void setCookiesForStream(AudioFileStreamID inAudioFileStream);
-        unsigned bitrate();
-        double bitrateDouble();
+        double bitrate();
         
         int cachedDataCount();
         void enqueueCachedData(int minPacketsRequired);

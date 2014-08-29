@@ -274,22 +274,12 @@ NSString *userAgent();
  * This property has the current playback position, if the stream is non-continuous.
  * The current playback position cannot be determined for continuous streams.
  */
-@property (nonatomic,readonly) FSStreamPosition currentTimePlayed;
-/**
- * This property has the current playback position, if the stream is non-continuous.
- * The current playback position cannot be determined for continuous streams.
- */
-@property (nonatomic,readonly) double currentTimePlayedDouble;
+@property (nonatomic,readonly) double currentTimePlayed;
 /**
  * This property has the duration of the stream, if the stream is non-continuous.
  * Continuous streams do not have a duration.
  */
-@property (nonatomic,readonly) FSStreamPosition duration;
-/**
- * This property has the duration of the stream, if the stream is non-continuous.
- * Continuous streams do not have a duration.
- */
-@property (nonatomic,readonly) double durationDouble;
+@property (nonatomic,readonly) double duration;
 /**
  * This property has the current seek byte offset of the stream, if the stream is non-continuous.
  * Continuous streams do not have a seek byte offset.
